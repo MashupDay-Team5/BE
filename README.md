@@ -1,24 +1,6 @@
 # BE
 CEOS-24th MashupDay Team5 모두닥 역기획 프로젝트 백엔드
 
-## 실행 및 Health Check
-
-1. Java 버전: 21
-2. 실행 명령어: `./gradlew bootRun`
-3. Health Check API: `GET /api/health`
-
-애플리케이션 실행 후 다음 명령어로 `200 OK` 응답을 확인할 수 있습니다.
-
-```bash
-curl -i http://localhost:8080/api/health
-```
-
-```json
-{
-  "status": "ok"
-}
-```
-
 ## Git Convention
 
 ## 브랜치 전략
