@@ -1,0 +1,92 @@
+name: CD
+
+# develop에 push될 때 (= PR이 develop에 머지될 때) 실행
+on:
+  push:
+    branches: [ develop ]
+  workflow_dispatch:
+
+jobs:
+  # ── Job 1: jar 빌드 → Docker 이미지 → Docker Hub 업로드 ──
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build jar
+        run: ./gradlew clean bootJar
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Build & Push Docker image
+        run: |
+          docker build -t ${{ vars.DOCKER_IMAGE_NAME }}:${{ github.sha }} .
+          docker push ${{ vars.DOCKER_IMAGE_NAME }}:${{ github.sha }}
+
+  # ── Job 2: EC2 접속 → 컨테이너 교체 → 헬스체크 ──
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            IMAGE=${{ vars.DOCKER_IMAGE_NAME }}:${{ github.sha }}
+            CONTAINER=mashup-be
+            ENV_FILE=/home/ubuntu/mashup/.env
+
+            # 0. .env 파일이 있는지 먼저 확인 (없으면 DB 연결이 안 되니 바로 실패 처리)
+            if [ ! -f "$ENV_FILE" ]; then
+              echo "$ENV_FILE 파일이 없습니다"
+              exit 1
+            fi
+
+            # 1. 새 이미지 다운로드
+            docker pull $IMAGE
+
+            # 2. 기존 컨테이너 종료/삭제
+            docker stop $CONTAINER || true
+            docker rm $CONTAINER || true
+
+            # 3. 새 컨테이너 실행 (.env의 DB 정보 주입)
+            docker run -d --name $CONTAINER \
+              -p 8080:8080 \
+              --env-file $ENV_FILE \
+              --restart unless-stopped \
+              $IMAGE
+
+            # 4. 안 쓰는 이미지 정리
+            docker image prune -af
+
+            # 5. 헬스체크: 최대 100초 대기 (JPA + RDS 연결로 시작이 느릴 수 있음)
+            for i in $(seq 1 20); do
+              if curl -fs http://localhost:8080/api/health > /dev/null; then
+                echo "배포 성공"
+                exit 0
+              fi
+              sleep 5
+            done
+            echo "헬스체크 실패, 최근 로그:"
+            docker logs --tail 100 $CONTAINER
+            exit 1
