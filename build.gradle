@@ -13,6 +13,10 @@ java {
 	}
 }
 
+jar {
+	enabled = false
+}
+
 repositories {
 	mavenCentral()
 }
@@ -34,4 +38,5 @@ dependencies {
 
 tasks.named('test') {
 	useJUnitPlatform()
+	systemProperty 'spring.profiles.active', 'test'
 }
