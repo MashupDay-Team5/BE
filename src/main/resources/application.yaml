@@ -10,3 +10,8 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: update
+
+openai:
+  api-key: ${OPENAI_API_KEY}
+  model: ${OPENAI_MODEL}
+  timeout: ${OPENAI_TIMEOUT}
