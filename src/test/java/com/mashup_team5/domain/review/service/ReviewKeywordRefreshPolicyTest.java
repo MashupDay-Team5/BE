@@ -37,16 +37,24 @@ class ReviewKeywordRefreshPolicyTest {
 			NOW.minusHours(elapsedHours), NOW)).isFalse();
 	}
 
-	@Test
-	@DisplayName("정확히 24시간이 지나면 추가 후기가 없어도 갱신한다")
-	void refreshesAtTwentyFourHoursWithoutNewReviews() {
-		assertThat(policy.shouldRefresh(10, 0, NOW.minusHours(24), NOW)).isTrue();
+	@ParameterizedTest
+	@ValueSource(ints = {24, 25, 48, 168})
+	@DisplayName("24시간 이상 지나도 추가 후기가 없으면 갱신하지 않는다")
+	void skipsAfterTwentyFourHoursWithoutNewReviews(int elapsedHours) {
+		assertThat(policy.shouldRefresh(10, 0, NOW.minusHours(elapsedHours), NOW)).isFalse();
+	}
+
+	@ParameterizedTest
+	@ValueSource(ints = {1, 4})
+	@DisplayName("정확히 24시간이 지나고 추가 후기가 1~4개면 갱신한다")
+	void refreshesAtTwentyFourHoursWithNewReviews(int addedReviewCount) {
+		assertThat(policy.shouldRefresh(10 + addedReviewCount, addedReviewCount, NOW.minusHours(24), NOW)).isTrue();
 	}
 
 	@Test
-	@DisplayName("24시간 직전에는 추가 후기가 없으면 갱신하지 않는다")
+	@DisplayName("24시간 직전에는 추가 후기가 1개여도 갱신하지 않는다")
 	void skipsJustBeforeTwentyFourHours() {
-		assertThat(policy.shouldRefresh(10, 0, NOW.minusHours(24).plusNanos(1), NOW)).isFalse();
+		assertThat(policy.shouldRefresh(11, 1, NOW.minusHours(24).plusNanos(1), NOW)).isFalse();
 	}
 
 	@Test
