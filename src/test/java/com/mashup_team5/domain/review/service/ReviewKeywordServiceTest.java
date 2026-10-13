@@ -6,6 +6,7 @@ import com.mashup_team5.domain.review.entity.Review;
 import com.mashup_team5.domain.review.entity.ReviewKeyword;
 import com.mashup_team5.domain.review.entity.ReviewTreatment;
 import com.mashup_team5.domain.review.repository.ReviewKeywordRepository;
+import com.mashup_team5.domain.review.repository.ReviewKeywordTargetRepository;
 import com.mashup_team5.domain.treatment.entity.Treatment;
 import com.mashup_team5.global.exception.CustomException;
 import com.mashup_team5.global.exception.ErrorCode;
@@ -24,6 +25,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -36,10 +39,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-@SpringBootTest(properties = {
-	"spring.datasource.url=jdbc:h2:mem:review-keyword-storage;MODE=MySQL;DB_CLOSE_DELAY=-1;NON_KEYWORDS=USER",
-	"openai.api-key=test-api-key", "openai.model=gpt-4.1-mini", "openai.timeout=30s"
-})
+@SpringBootTest
+@ActiveProfiles("test")
 class ReviewKeywordServiceTest {
 
 	private static final LocalDateTime NOW = LocalDateTime.of(2026, 10, 11, 12, 0);
@@ -52,6 +53,9 @@ class ReviewKeywordServiceTest {
 
 	@Autowired
 	private ReviewKeywordSourceService sourceService;
+
+	@Autowired
+	private ReviewKeywordTargetRepository targetRepository;
 
 	@Autowired
 	private EntityManager entityManager;
@@ -76,6 +80,28 @@ class ReviewKeywordServiceTest {
 			entityManager.persist(hospitalTreatment);
 			return hospitalTreatment;
 		});
+	}
+
+	@Test
+	@DisplayName("자동 갱신 대상은 마지막 ID 이후를 페이지로 조회하고 병원·시술 정보도 함께 읽는다")
+	void findsNextTargetBatchWithHospitalAndTreatment() {
+		HospitalTreatment next = transactionTemplate.execute(status -> {
+			Hospital hospital = Hospital.builder().name("다음 병원").build();
+			entityManager.persist(hospital);
+			HospitalTreatment hospitalTreatment = HospitalTreatment.builder()
+				.hospital(hospital).treatment(target.getTreatment()).build();
+			entityManager.persist(hospitalTreatment);
+			return hospitalTreatment;
+		});
+		PageRequest batchRequest = PageRequest.of(0, 1);
+
+		List<HospitalTreatment> firstBatch = targetRepository.findNextBatch(target.getId() - 1, batchRequest);
+		assertThat(firstBatch).extracting(HospitalTreatment::getId).containsExactly(target.getId());
+		assertThat(firstBatch.getFirst().getHospital().getName()).isEqualTo("테스트 병원");
+		assertThat(firstBatch.getFirst().getTreatment().getName()).isEqualTo("라식");
+		assertThat(targetRepository.findNextBatch(target.getId(), batchRequest))
+			.extracting(HospitalTreatment::getId).containsExactly(next.getId());
+		assertThat(targetRepository.findNextBatch(next.getId(), batchRequest)).isEmpty();
 	}
 
 	@Test
@@ -317,7 +343,7 @@ class ReviewKeywordServiceTest {
 	void refreshesAfterTwentyFourHoursWithNewReviews(int addedCount) {
 		createReviews(10);
 		createKeywords(target, List.of("기존 키워드"));
-		ReviewKeyword previousState = createState(LocalDateTime.now().minusHours(24), lastReviewId());
+		ReviewKeyword previousState = createState(LocalDateTime.now().minusHours(25), lastReviewId());
 		createReviews(addedCount);
 		when(extractionService.extractKeywords(anyList())).thenReturn(List.of("새 키워드"));
 
