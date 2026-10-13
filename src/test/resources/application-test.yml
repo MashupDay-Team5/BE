@@ -1,9 +1,18 @@
 spring:
   datasource:
-    url: jdbc:h2:mem:testdb;MODE=MySQL;DB_CLOSE_DELAY=-1
+    url: jdbc:h2:mem:testdb;MODE=MySQL;DB_CLOSE_DELAY=-1;NON_KEYWORDS=USER
     username: sa
     password:
     driver-class-name: org.h2.Driver
   jpa:
     hibernate:
       ddl-auto: create-drop
+
+openai:
+  api-key: test-api-key
+  model: gpt-4.1-mini
+  timeout: 30s
+
+review-keyword:
+  refresh:
+    enabled: false
