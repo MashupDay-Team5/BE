@@ -15,3 +15,8 @@ openai:
   api-key: ${OPENAI_API_KEY}
   model: ${OPENAI_MODEL}
   timeout: ${OPENAI_TIMEOUT}
+
+review-keyword:
+  refresh:
+    # 리뷰 키워드 자동 갱신 실행 여부 (true: 실행, false : 중지)
+    enabled: ${REVIEW_KEYWORD_REFRESH_ENABLED}
