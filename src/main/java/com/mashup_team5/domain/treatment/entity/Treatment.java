@@ -9,6 +9,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -16,7 +17,9 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @Entity
-@Table(name = "treatment")
+@Table(name = "treatment", uniqueConstraints = {
+	@UniqueConstraint(name = "uk_treatment_category_name", columnNames = {"treatment_category_id", "name"})
+})
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Treatment {
 
@@ -32,9 +35,13 @@ public class Treatment {
 	@Column(name = "name")
 	private String name;
 
+	@Column(name = "display_order")
+	private Integer displayOrder;
+
 	@Builder
-	public Treatment(TreatmentCategory treatmentCategory, String name) {
+	public Treatment(TreatmentCategory treatmentCategory, String name, Integer displayOrder) {
 		this.treatmentCategory = treatmentCategory;
 		this.name = name;
+		this.displayOrder = displayOrder;
 	}
 }
