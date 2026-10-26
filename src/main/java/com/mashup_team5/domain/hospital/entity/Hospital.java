@@ -28,7 +28,7 @@ public class Hospital {
 	private Long id;
 
 	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "region_id")
+	@JoinColumn(name = "region_id", nullable = false)
 	private Region region;
 
 	@Column(name = "name")
