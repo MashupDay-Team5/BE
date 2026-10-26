@@ -321,7 +321,7 @@ class HospitalControllerTest {
     }
 
     @Test
-    @DisplayName("잘못된 가격 범위, 낮은 가격 정렬 조건, 페이지 요청은 Bad Request로 처리한다")
+    @DisplayName("잘못된 가격 범위, 낮은 가격 정렬 조건, 페이지, 지역 개수 요청은 Bad Request로 처리한다")
     void rejectInvalidConditions() throws Exception {
         assertBadRequest(get("/api/hospitals").param("minPrice", "200").param("maxPrice", "100"), "INVALID_PRICE_RANGE400");
         assertBadRequest(get("/api/hospitals").param("sort", "LOW_PRICE"), "TREATMENT_REQUIRED_FOR_PRICE_SORT400");
@@ -330,6 +330,12 @@ class HospitalControllerTest {
         assertBadRequest(get("/api/hospitals").param("maxPrice", "15000001"));
         assertBadRequest(get("/api/hospitals").param("page", "-1"));
         assertBadRequest(get("/api/hospitals").param("size", "51"));
+
+        MockHttpServletRequestBuilder tooManyRegions = get("/api/hospitals");
+        for (long id = 1; id <= 6; id++) {
+            tooManyRegions.param("regionIds", String.valueOf(id));
+        }
+        assertBadRequest(tooManyRegions);
     }
 
     @Test

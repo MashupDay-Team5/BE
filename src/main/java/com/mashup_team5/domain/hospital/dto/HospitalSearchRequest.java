@@ -3,10 +3,7 @@ package com.mashup_team5.domain.hospital.dto;
 import com.mashup_team5.domain.hospital.repository.HospitalSearchCondition;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.Positive;
-import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.*;
 
 import java.util.List;
 
@@ -19,10 +16,9 @@ public record HospitalSearchRequest(
                 example = "2", minimum = "1")
         @Positive Long treatmentId,
         @ArraySchema(
-                arraySchema = @Schema(description = "선택한 지역 ID 목록. Add item으로 ID를 하나씩 추가하며 복수 조건은 OR로 적용됩니다."),
-                schema = @Schema(description = "SIDO 또는 SIGUNGU 지역 ID", example = "1", minimum = "1")
-        )
-        List<@Positive Long> regionIds,
+                arraySchema = @Schema(description = "선택한 지역 ID 목록. 최대 5개까지 선택할 수 있으며 복수 조건은 OR로 적용됩니다."),
+                schema = @Schema(description = "SIDO 또는 SIGUNGU 지역 ID", example = "1", minimum = "1"), maxItems = 5)
+        @Size(max = 5) List<@Positive Long> regionIds,
         @Schema(description = "최소 유효 가격. 생략하면 하한을 적용하지 않으며 0은 실제 0원 조건입니다.",
                 example = "1000000", minimum = "0", maximum = "15000000")
         @PositiveOrZero @Max(15000000) Integer minPrice,
