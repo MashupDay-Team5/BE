@@ -18,7 +18,11 @@ public enum ErrorCode {
 	// OpenAI
 	OPENAI_NOT_CONFIGURED(HttpStatus.SERVICE_UNAVAILABLE, "OPENAI_NOT_CONFIGURED", "OpenAI API 설정이 필요합니다."),
 	OPENAI_REQUEST_FAILED(HttpStatus.BAD_GATEWAY, "OPENAI_REQUEST_FAILED", "리뷰 키워드 생성 요청에 실패했습니다."),
-	OPENAI_INVALID_RESPONSE(HttpStatus.BAD_GATEWAY, "OPENAI_INVALID_RESPONSE", "리뷰 키워드 생성 결과가 올바르지 않습니다.");
+	OPENAI_INVALID_RESPONSE(HttpStatus.BAD_GATEWAY, "OPENAI_INVALID_RESPONSE", "리뷰 키워드 생성 결과가 올바르지 않습니다."),
+
+	// 병원-시술
+	INVALID_ID(HttpStatus.BAD_REQUEST, "INVALID_ID400", "병원·시술 ID는 1 이상의 정수여야 합니다."),
+	HOSPITAL_TREATMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "HOSPITAL_TREATMENT_NOT_FOUND404", "해당 병원·시술을 찾을 수 없습니다.");
 
 	private final HttpStatus httpStatus;
 	private final String code;
