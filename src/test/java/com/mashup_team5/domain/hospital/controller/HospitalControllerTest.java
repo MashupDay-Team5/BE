@@ -408,6 +408,22 @@ class HospitalControllerTest {
                 .andExpect(jsonPath("$.data").value(2));
     }
 
+    @Test
+    @DisplayName("평점은 소수 첫째 자리로 반올림한다")
+    void roundRating() throws Exception {
+        persist(review(secondHospital, "4.0"));
+        persist(review(secondHospital, "4.0"));
+        entityManager.flush();
+        entityManager.clear();
+
+        // 나병원 리뷰: 5.0, 4.0, 4.0 → 평균 4.333... → 4.3
+        mockMvc.perform(get("/api/hospitals")
+                        .param("regionIds", seocho.getId().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].hospitalId").value(secondHospital.getId()))
+                .andExpect(jsonPath("$.data.content[0].rating").value(4.3));
+    }
+
     private Hospital hospital(
             String name,
             Region region,

@@ -99,7 +99,9 @@ public class HospitalService {
             List<HospitalTreatmentPriceRow> priceRows,
             Map<Long, Integer> mallPrices,
             HospitalSearchCondition condition) {
-        double rating = statistics == null || statistics.rating() == null ? 0.0 : statistics.rating();
+        double rating = statistics == null || statistics.rating() == null
+                ? 0.0
+                : Math.round(statistics.rating() * 10) / 10.0;
         long reviewCount = statistics == null ? 0L : statistics.reviewCount();
         return new HospitalResponse(
                 hospital.getId(),
