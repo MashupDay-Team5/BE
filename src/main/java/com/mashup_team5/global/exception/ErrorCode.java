@@ -8,28 +8,28 @@ import org.springframework.http.HttpStatus;
 @RequiredArgsConstructor
 public enum ErrorCode {
 
-    BAD_REQUEST(HttpStatus.BAD_REQUEST, "COMMON400", "잘못된 요청입니다."),
-    NOT_FOUND(HttpStatus.NOT_FOUND, "COMMON404", "요청한 리소스를 찾을 수 없습니다."),
-    METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "COMMON405", "지원하지 않는 HTTP 메서드입니다."),
-    NOT_ACCEPTABLE(HttpStatus.NOT_ACCEPTABLE, "COMMON406", "요청한 응답 형식을 지원하지 않습니다."),
-    UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "COMMON415", "지원하지 않는 요청 형식입니다."),
-    INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR", "서버 오류가 발생했습니다."),
+	BAD_REQUEST(HttpStatus.BAD_REQUEST, "COMMON400", "잘못된 요청입니다."),
+	NOT_FOUND(HttpStatus.NOT_FOUND, "COMMON404", "요청한 리소스를 찾을 수 없습니다."),
+	METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "COMMON405", "지원하지 않는 HTTP 메서드입니다."),
+	NOT_ACCEPTABLE(HttpStatus.NOT_ACCEPTABLE, "COMMON406", "요청한 응답 형식을 지원하지 않습니다."),
+	UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "COMMON415", "지원하지 않는 요청 형식입니다."),
+	INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR", "서버 오류가 발생했습니다."),
 
-    // OpenAI
-    OPENAI_NOT_CONFIGURED(HttpStatus.SERVICE_UNAVAILABLE, "OPENAI_NOT_CONFIGURED", "OpenAI API 설정이 필요합니다."),
-    OPENAI_REQUEST_FAILED(HttpStatus.BAD_GATEWAY, "OPENAI_REQUEST_FAILED", "리뷰 키워드 생성 요청에 실패했습니다."),
-    OPENAI_INVALID_RESPONSE(HttpStatus.BAD_GATEWAY, "OPENAI_INVALID_RESPONSE", "리뷰 키워드 생성 결과가 올바르지 않습니다."),
+	// OpenAI
+	OPENAI_NOT_CONFIGURED(HttpStatus.SERVICE_UNAVAILABLE, "OPENAI_NOT_CONFIGURED", "OpenAI API 설정이 필요합니다."),
+	OPENAI_REQUEST_FAILED(HttpStatus.BAD_GATEWAY, "OPENAI_REQUEST_FAILED", "리뷰 키워드 생성 요청에 실패했습니다."),
+	OPENAI_INVALID_RESPONSE(HttpStatus.BAD_GATEWAY, "OPENAI_INVALID_RESPONSE", "리뷰 키워드 생성 결과가 올바르지 않습니다."),
 
-    // 병원-시술
-    INVALID_ID(HttpStatus.BAD_REQUEST, "INVALID_ID400", "병원·시술 ID는 1 이상의 정수여야 합니다."),
-    INVALID_REVIEW_SCOPE(HttpStatus.BAD_REQUEST, "INVALID_REVIEW_SCOPE400", "지원하지 않는 후기 조회 범위입니다."),
-    INVALID_SORT(HttpStatus.BAD_REQUEST, "INVALID_SORT400", "지원하지 않는 정렬 방식입니다."),
-    INVALID_PAGINATION(HttpStatus.BAD_REQUEST, "INVALID_PAGINATION400", "page는 0 이상, size는 1~50이어야 합니다."),
-    HOSPITAL_TREATMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "HOSPITAL_TREATMENT_NOT_FOUND404", "해당 병원·시술을 찾을 수 없습니다."),
-    INVALID_PRICE_RANGE(HttpStatus.BAD_REQUEST, "INVALID_PRICE_RANGE400", "최소 가격은 최대 가격보다 클 수 없습니다."),
-    TREATMENT_REQUIRED_FOR_PRICE_SORT(HttpStatus.BAD_REQUEST, "TREATMENT_REQUIRED_FOR_PRICE_SORT400", "낮은 가격순 정렬은 시술을 선택해야 합니다.");
+	// 병원-시술
+	INVALID_ID(HttpStatus.BAD_REQUEST, "INVALID_ID400", "병원·시술 ID는 1 이상의 정수여야 합니다."),
+	INVALID_REVIEW_SCOPE(HttpStatus.BAD_REQUEST, "INVALID_REVIEW_SCOPE400", "지원하지 않는 후기 조회 범위입니다."),
+	INVALID_SORT(HttpStatus.BAD_REQUEST, "INVALID_SORT400", "지원하지 않는 정렬 방식입니다."),
+	INVALID_PAGINATION(HttpStatus.BAD_REQUEST, "INVALID_PAGINATION400", "page는 0 이상, size는 1~50이어야 합니다."),
+	HOSPITAL_TREATMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "HOSPITAL_TREATMENT_NOT_FOUND404", "해당 병원·시술을 찾을 수 없습니다."),
+	INVALID_PRICE_RANGE(HttpStatus.BAD_REQUEST, "INVALID_PRICE_RANGE400", "최소 가격은 최대 가격보다 클 수 없습니다."),
+	TREATMENT_REQUIRED_FOR_PRICE_SORT(HttpStatus.BAD_REQUEST, "TREATMENT_REQUIRED_FOR_PRICE_SORT400", "낮은 가격순 정렬은 시술을 선택해야 합니다.");
 
-    private final HttpStatus httpStatus;
-    private final String code;
-    private final String message;
+	private final HttpStatus httpStatus;
+	private final String code;
+	private final String message;
 }
