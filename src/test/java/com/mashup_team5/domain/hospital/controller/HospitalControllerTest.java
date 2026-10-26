@@ -329,7 +329,7 @@ class HospitalControllerTest {
         assertBadRequest(get("/api/hospitals").param("minPrice", "-1"));
         assertBadRequest(get("/api/hospitals").param("maxPrice", "15000001"));
         assertBadRequest(get("/api/hospitals").param("page", "-1"));
-        assertBadRequest(get("/api/hospitals").param("size", "101"));
+        assertBadRequest(get("/api/hospitals").param("size", "51"));
     }
 
     @Test
