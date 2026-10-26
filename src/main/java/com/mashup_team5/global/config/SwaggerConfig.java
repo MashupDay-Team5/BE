@@ -13,9 +13,10 @@ public class SwaggerConfig {
 	@Bean
 	public OpenAPI openAPI() {
 		return new OpenAPI()
+			.servers(List.of(new Server().url("/")))
 			.info(new Info()
-				.title("Modoodoc API")
-				.description("모두닥 역기획 프로젝트 API")
-				.version("v1.0"));
+			.title("Modoodoc API")
+			.description("모두닥 역기획 프로젝트 API")
+			.version("v1.0"));
 	}
 }
