@@ -2,6 +2,8 @@ package com.mashup_team5.domain.review.service;
 
 import com.mashup_team5.domain.hospital.entity.Hospital;
 import com.mashup_team5.domain.hospital.entity.HospitalTreatment;
+import com.mashup_team5.domain.region.entity.Region;
+import com.mashup_team5.domain.region.entity.RegionType;
 import com.mashup_team5.domain.review.entity.Review;
 import com.mashup_team5.domain.review.entity.ReviewKeyword;
 import com.mashup_team5.domain.review.entity.ReviewTreatment;
@@ -67,11 +69,14 @@ class ReviewKeywordServiceTest {
 	private ReviewKeywordExtractionService extractionService;
 
 	private HospitalTreatment target;
+	private Region region;
 
 	@BeforeEach
 	void setUp() {
 		target = transactionTemplate.execute(status -> {
-			Hospital hospital = Hospital.builder().name("테스트 병원").build();
+			region = Region.builder().name("서울특별시").regionType(RegionType.SIDO).build();
+			entityManager.persist(region);
+			Hospital hospital = Hospital.builder().region(region).name("테스트 병원").build();
 			Treatment treatment = Treatment.builder().name("라식").build();
 			entityManager.persist(hospital);
 			entityManager.persist(treatment);
@@ -86,7 +91,7 @@ class ReviewKeywordServiceTest {
 	@DisplayName("자동 갱신 대상은 마지막 ID 이후를 페이지로 조회하고 병원·시술 정보도 함께 읽는다")
 	void findsNextTargetBatchWithHospitalAndTreatment() {
 		HospitalTreatment next = transactionTemplate.execute(status -> {
-			Hospital hospital = Hospital.builder().name("다음 병원").build();
+			Hospital hospital = Hospital.builder().region(region).name("다음 병원").build();
 			entityManager.persist(hospital);
 			HospitalTreatment hospitalTreatment = HospitalTreatment.builder()
 				.hospital(hospital).treatment(target.getTreatment()).build();
@@ -293,7 +298,7 @@ class ReviewKeywordServiceTest {
 	void leavesOtherTargetsUnchanged() {
 		createReviews(10);
 		HospitalTreatment otherTarget = transactionTemplate.execute(status -> {
-			Hospital hospital = Hospital.builder().name("다른 병원").build();
+			Hospital hospital = Hospital.builder().region(region).name("다른 병원").build();
 			entityManager.persist(hospital);
 			HospitalTreatment hospitalTreatment = HospitalTreatment.builder()
 				.hospital(hospital).treatment(target.getTreatment()).build();
