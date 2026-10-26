@@ -1,9 +1,13 @@
 package com.mashup_team5.domain.review.service;
 
 import com.mashup_team5.domain.hospital.entity.HospitalTreatment;
+import com.mashup_team5.domain.review.dto.response.ReviewKeywordRes;
 import com.mashup_team5.domain.review.entity.Review;
 import com.mashup_team5.domain.review.entity.ReviewKeyword;
 import com.mashup_team5.domain.review.repository.ReviewKeywordRepository;
+import com.mashup_team5.domain.review.repository.ReviewKeywordTargetRepository;
+import com.mashup_team5.global.exception.CustomException;
+import com.mashup_team5.global.exception.ErrorCode;
 import jakarta.persistence.EntityManager;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -17,12 +21,33 @@ import org.springframework.transaction.support.TransactionTemplate;
 @RequiredArgsConstructor
 public class ReviewKeywordService {
 
+	private static final int MAX_KEYWORDS = 6;
+
 	private final ReviewKeywordSourceService sourceService;
 	private final ReviewKeywordExtractionService extractionService;
 	private final ReviewKeywordRepository reviewKeywordRepository;
 	private final EntityManager entityManager;
 	private final ReviewKeywordRefreshPolicy refreshPolicy;
 	private final TransactionTemplate transactionTemplate;
+	private final ReviewKeywordTargetRepository targetRepository;
+
+	@Transactional(readOnly = true)
+	public ReviewKeywordRes getKeywords(Long hospitalId, Long treatmentId) {
+		if (hospitalId == null || treatmentId == null || hospitalId < 1 || treatmentId < 1) {
+			throw new CustomException(ErrorCode.INVALID_ID);
+		}
+
+		HospitalTreatment target = targetRepository.findByHospitalIdAndTreatmentId(hospitalId, treatmentId)
+			.orElseThrow(() -> new CustomException(ErrorCode.HOSPITAL_TREATMENT_NOT_FOUND));
+		List<String> keywords = reviewKeywordRepository.findByHospitalTreatmentId(target.getId())
+			.map(ReviewKeyword::getKeywords)
+			.orElse(List.of())
+			.stream()
+			.distinct()
+			.limit(MAX_KEYWORDS)
+			.toList();
+		return new ReviewKeywordRes(hospitalId, treatmentId, keywords);
+	}
 
 	// 자동 갱신 작업에서 호출한다. 조건 미충족은 false, 성공한 빈 결과는 true다.
 	@Transactional(propagation = Propagation.NOT_SUPPORTED)
