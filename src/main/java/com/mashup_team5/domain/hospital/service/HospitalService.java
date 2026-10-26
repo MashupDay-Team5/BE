@@ -2,6 +2,8 @@ package com.mashup_team5.domain.hospital.service;
 
 import com.mashup_team5.domain.hospital.dto.*;
 import com.mashup_team5.domain.hospital.entity.Hospital;
+import com.mashup_team5.domain.hospital.enums.HospitalSort;
+import com.mashup_team5.domain.hospital.enums.PriceType;
 import com.mashup_team5.domain.hospital.repository.HospitalIdSlice;
 import com.mashup_team5.domain.hospital.repository.HospitalRepository;
 import com.mashup_team5.domain.hospital.repository.HospitalSearchCondition;

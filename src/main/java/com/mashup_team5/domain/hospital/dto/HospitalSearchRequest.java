@@ -1,5 +1,6 @@
 package com.mashup_team5.domain.hospital.dto;
 
+import com.mashup_team5.domain.hospital.enums.HospitalSort;
 import com.mashup_team5.domain.hospital.repository.HospitalSearchCondition;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Schema;
