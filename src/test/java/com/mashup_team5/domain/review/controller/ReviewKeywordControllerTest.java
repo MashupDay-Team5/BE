@@ -125,7 +125,7 @@ class ReviewKeywordControllerTest {
 
 		String body = mockMvc.perform(get(KEYWORDS_URL, 1, 2))
 			.andExpect(status().isInternalServerError())
-			.andExpect(jsonPath("$.code").value("INTERNAL_SERVER_ERROR500"))
+			.andExpect(jsonPath("$.code").value("INTERNAL_SERVER_ERROR"))
 			.andExpect(jsonPath("$.data").value((Object) null))
 			.andReturn().getResponse().getContentAsString();
 
