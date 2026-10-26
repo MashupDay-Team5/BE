@@ -1,6 +1,8 @@
 package com.mashup_team5.domain.review.repository;
 
+import com.mashup_team5.domain.hospital.repository.projection.HospitalReviewStatistics;
 import com.mashup_team5.domain.review.entity.Review;
+import java.util.Collection;
 import java.util.List;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -47,6 +49,17 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
 		@Param("sort") String sort,
 		Pageable pageable
 	);
+
+	@Query("""
+		select new com.mashup_team5.domain.hospital.repository.projection.HospitalReviewStatistics(
+			r.hospital.id, avg(r.rating), count(r.id)
+		)
+		from Review r
+		where r.hospital.id in :hospitalIds
+		group by r.hospital.id
+		""")
+	List<HospitalReviewStatistics> findStatisticsByHospitalIds(
+		@Param("hospitalIds") Collection<Long> hospitalIds);
 
 	@Query("""
 		select r from Review r
