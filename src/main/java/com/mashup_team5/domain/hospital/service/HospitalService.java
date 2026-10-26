@@ -72,10 +72,10 @@ public class HospitalService {
         HospitalSearchCondition condition = request.toCondition();
         if (condition.minPrice() != null && condition.maxPrice() != null
                 && condition.minPrice() > condition.maxPrice()) {
-            throw new CustomException(ErrorCode.BAD_REQUEST);
+            throw new CustomException(ErrorCode.INVALID_PRICE_RANGE);
         }
         if (condition.sort() == HospitalSort.LOW_PRICE && condition.treatmentId() == null) {
-            throw new CustomException(ErrorCode.BAD_REQUEST);
+            throw new CustomException(ErrorCode.TREATMENT_REQUIRED_FOR_PRICE_SORT);
         }
         return condition;
     }

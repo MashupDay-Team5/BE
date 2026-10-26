@@ -323,8 +323,8 @@ class HospitalControllerTest {
     @Test
     @DisplayName("잘못된 가격 범위, 낮은 가격 정렬 조건, 페이지 요청은 Bad Request로 처리한다")
     void rejectInvalidConditions() throws Exception {
-        assertBadRequest(get("/api/hospitals").param("minPrice", "200").param("maxPrice", "100"));
-        assertBadRequest(get("/api/hospitals").param("sort", "LOW_PRICE"));
+        assertBadRequest(get("/api/hospitals").param("minPrice", "200").param("maxPrice", "100"), "INVALID_PRICE_RANGE400");
+        assertBadRequest(get("/api/hospitals").param("sort", "LOW_PRICE"), "TREATMENT_REQUIRED_FOR_PRICE_SORT400");
         assertBadRequest(get("/api/hospitals").param("sort", "SATISFACTION"));
         assertBadRequest(get("/api/hospitals").param("minPrice", "-1"));
         assertBadRequest(get("/api/hospitals").param("maxPrice", "15000001"));
@@ -456,10 +456,14 @@ class HospitalControllerTest {
     }
 
     private void assertBadRequest(MockHttpServletRequestBuilder request) throws Exception {
+        assertBadRequest(request, "COMMON400");
+    }
+
+    private void assertBadRequest(MockHttpServletRequestBuilder request, String code) throws Exception {
         mockMvc.perform(request)
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.code").value("COMMON400"));
+                .andExpect(jsonPath("$.code").value(code));
     }
 
     private Statistics statistics() {
