@@ -28,7 +28,7 @@ public class Hospital {
 	private Long id;
 
 	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "region_id")
+	@JoinColumn(name = "region_id", nullable = false)
 	private Region region;
 
 	@Column(name = "name")
@@ -55,10 +55,14 @@ public class Hospital {
 	@Column(name = "is_reservable")
 	private Boolean isReservable;
 
+	@Column(name = "monthly_visit_count")
+	private Integer monthlyVisitCount;
+
 	@Builder
 	public Hospital(
 		Region region, String name, BigDecimal latitude, BigDecimal longitude, Boolean hasSpecialist,
-		Boolean hasPublicPrice, Boolean hasNightClinic, Boolean hasHolidayClinic, Boolean isReservable) {
+		Boolean hasPublicPrice, Boolean hasNightClinic, Boolean hasHolidayClinic, Boolean isReservable,
+		Integer monthlyVisitCount) {
 		this.region = region;
 		this.name = name;
 		this.latitude = latitude;
@@ -68,5 +72,6 @@ public class Hospital {
 		this.hasNightClinic = hasNightClinic;
 		this.hasHolidayClinic = hasHolidayClinic;
 		this.isReservable = isReservable;
+		this.monthlyVisitCount = monthlyVisitCount;
 	}
 }

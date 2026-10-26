@@ -30,14 +30,14 @@ public class MallPrice {
 	private Long id;
 
 	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "hospital_treatment_id")
+	@JoinColumn(name = "hospital_treatment_id", nullable = false)
 	private HospitalTreatment hospitalTreatment;
 
 	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "mall_id")
+	@JoinColumn(name = "mall_id", nullable = false)
 	private Mall mall;
 
-	@Column(name = "price")
+	@Column(name = "price", nullable = false)
 	private Integer price;
 
 	@Builder

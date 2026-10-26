@@ -25,7 +25,9 @@ public enum ErrorCode {
 	INVALID_REVIEW_SCOPE(HttpStatus.BAD_REQUEST, "INVALID_REVIEW_SCOPE400", "지원하지 않는 후기 조회 범위입니다."),
 	INVALID_SORT(HttpStatus.BAD_REQUEST, "INVALID_SORT400", "지원하지 않는 정렬 방식입니다."),
 	INVALID_PAGINATION(HttpStatus.BAD_REQUEST, "INVALID_PAGINATION400", "page는 0 이상, size는 1~50이어야 합니다."),
-	HOSPITAL_TREATMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "HOSPITAL_TREATMENT_NOT_FOUND404", "해당 병원·시술을 찾을 수 없습니다.");
+	HOSPITAL_TREATMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "HOSPITAL_TREATMENT_NOT_FOUND404", "해당 병원·시술을 찾을 수 없습니다."),
+	INVALID_PRICE_RANGE(HttpStatus.BAD_REQUEST, "INVALID_PRICE_RANGE400", "최소 가격은 최대 가격보다 클 수 없습니다."),
+	TREATMENT_REQUIRED_FOR_PRICE_SORT(HttpStatus.BAD_REQUEST, "TREATMENT_REQUIRED_FOR_PRICE_SORT400", "낮은 가격순 정렬은 시술을 선택해야 합니다.");
 
 	private final HttpStatus httpStatus;
 	private final String code;
