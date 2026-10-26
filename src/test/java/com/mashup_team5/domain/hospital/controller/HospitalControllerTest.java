@@ -238,6 +238,25 @@ class HospitalControllerTest {
 	}
 
 	@Test
+	@DisplayName("시술과 몰 가격 범위를 적용하고 몰 가격이 있으면 정상가로 대체하지 않는다")
+	void filterByTreatmentAndEffectiveMallPriceRange() throws Exception {
+		assertHospitalIds(get("/api/hospitals")
+			.param("treatmentId", lasik.getId().toString())
+			.param("minPrice", "90000")
+			.param("maxPrice", "120000"), firstHospital);
+		assertHospitalIds(get("/api/hospitals")
+			.param("treatmentId", lasik.getId().toString())
+			.param("mallId", mall.getId().toString())
+			.param("minPrice", "60000")
+			.param("maxPrice", "80000"), firstHospital);
+		assertHospitalIds(get("/api/hospitals")
+			.param("treatmentId", lasik.getId().toString())
+			.param("mallId", mall.getId().toString())
+			.param("minPrice", "100000")
+			.param("maxPrice", "160000"), secondHospital);
+	}
+
+	@Test
 	@DisplayName("몰 가격이 있으면 우선 적용하고 없으면 정상가를 사용한다")
 	void filterAndRespondWithEffectiveMallPrice() throws Exception {
 		Statistics statistics = statistics();
@@ -324,6 +343,7 @@ class HospitalControllerTest {
 	@Test
 	@DisplayName("목록과 개수 조회는 같은 필터를 사용하고 결과가 없으면 빈 목록과 0을 반환한다")
 	void useSameConditionForListAndCount() throws Exception {
+		Statistics statistics = statistics();
 		MockHttpServletRequestBuilder listRequest = get("/api/hospitals")
 			.param("hasSpecialist", "true")
 			.param("regionIds", seoul.getId().toString());
@@ -331,23 +351,29 @@ class HospitalControllerTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.content.length()").value(1))
 			.andExpect(jsonPath("$.data.content[0].hospitalId").value(firstHospital.getId()));
+		statistics.clear();
 		mockMvc.perform(get("/api/hospitals/count")
 				.param("hasSpecialist", "true")
 				.param("regionIds", seoul.getId().toString()))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data").value(1));
+		org.assertj.core.api.Assertions.assertThat(statistics.getPrepareStatementCount()).isEqualTo(1);
 
+		statistics.clear();
 		mockMvc.perform(get("/api/hospitals")
 				.param("treatmentCategoryId", visionCorrection.getId().toString())
 				.param("minPrice", "1000000"))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.content").isEmpty())
 			.andExpect(jsonPath("$.data.hasNext").value(false));
+		org.assertj.core.api.Assertions.assertThat(statistics.getPrepareStatementCount()).isEqualTo(1);
+		statistics.clear();
 		mockMvc.perform(get("/api/hospitals/count")
 				.param("treatmentCategoryId", visionCorrection.getId().toString())
 				.param("minPrice", "1000000"))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data").value(0));
+		org.assertj.core.api.Assertions.assertThat(statistics.getPrepareStatementCount()).isEqualTo(1);
 	}
 
 	@Test
