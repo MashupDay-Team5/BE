@@ -1,6 +1,7 @@
 package com.mashup_team5.domain.hospital.service;
 
 import com.mashup_team5.domain.hospital.dto.*;
+import com.mashup_team5.domain.hospital.dto.HospitalDetailResponse.TreatmentDetailResponse;
 import com.mashup_team5.domain.hospital.entity.Hospital;
 import com.mashup_team5.domain.hospital.enums.HospitalSort;
 import com.mashup_team5.domain.hospital.enums.PriceType;
@@ -70,6 +71,38 @@ public class HospitalService {
 		return hospitalRepository.countHospitals(validatedCondition(request));
 	}
 
+	public HospitalDetailResponse getHospitalDetail(Long hospitalId, Long treatmentId, Long mallId) {
+		validateIds(hospitalId, treatmentId);
+		Hospital hospital = hospitalRepository.findAllWithRegionByIdIn(List.of(hospitalId)).stream()
+				.findFirst()
+				.orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND));
+		HospitalTreatmentPriceRow priceRow = hospitalTreatmentRepository
+				.findPriceRows(List.of(hospitalId), null, treatmentId).stream()
+				.findFirst()
+				.orElseThrow(() -> new CustomException(ErrorCode.HOSPITAL_TREATMENT_NOT_FOUND));
+		HospitalReviewStatistics statistics = reviewRepository.findStatisticsByHospitalIds(List.of(hospitalId)).stream()
+				.findFirst()
+				.orElse(null);
+		long totalReviewCount = reviewCount(statistics);
+		long relatedReviewCount = reviewRepository.countMatchingReviews(hospitalId, treatmentId, true);
+		long otherReviewCount = totalReviewCount - relatedReviewCount;
+		Integer discountPrice = findMallPrices(mallId, List.of(priceRow)).get(priceRow.hospitalTreatmentId());
+		return new HospitalDetailResponse(
+				hospital.getId(),
+				hospital.getName(),
+				toRegionResponse(hospital.getRegion()),
+				rating(statistics),
+				totalReviewCount,
+				relatedReviewCount,
+				otherReviewCount,
+				new TreatmentDetailResponse(
+						priceRow.treatmentId(),
+						priceRow.treatmentName(),
+						priceRow.regularPrice(),
+						discountPrice)
+		);
+	}
+
 	private HospitalSearchCondition validatedCondition(HospitalSearchRequest request) {
 		HospitalSearchCondition condition = request.toCondition();
 		if (condition.minPrice() != null && condition.maxPrice() != null
@@ -101,16 +134,12 @@ public class HospitalService {
 			List<HospitalTreatmentPriceRow> priceRows,
 			Map<Long, Integer> mallPrices,
 			HospitalSearchCondition condition) {
-		double rating = statistics == null || statistics.rating() == null
-				? 0.0
-				: Math.round(statistics.rating() * 10) / 10.0;
-		long reviewCount = statistics == null ? 0L : statistics.reviewCount();
 		return new HospitalResponse(
 				hospital.getId(),
 				hospital.getName(),
 				toRegionResponse(hospital.getRegion()),
-				rating,
-				reviewCount,
+				rating(statistics),
+				reviewCount(statistics),
 				hospital.getHasSpecialist(),
 				hospital.getHasPublicPrice(),
 				hospital.getHasNightClinic(),
@@ -121,6 +150,22 @@ public class HospitalService {
 						.filter(price -> isInPriceRange(price.displayPrice(), condition))
 						.toList()
 		);
+	}
+
+	private double rating(HospitalReviewStatistics statistics) {
+		return statistics == null || statistics.rating() == null
+				? 0.0
+				: Math.round(statistics.rating() * 10) / 10.0;
+	}
+
+	private long reviewCount(HospitalReviewStatistics statistics) {
+		return statistics == null ? 0L : statistics.reviewCount();
+	}
+
+	private void validateIds(Long hospitalId, Long treatmentId) {
+		if (hospitalId == null || treatmentId == null || hospitalId < 1 || treatmentId < 1) {
+			throw new CustomException(ErrorCode.INVALID_ID);
+		}
 	}
 
 	private boolean isInPriceRange(Integer price, HospitalSearchCondition condition) {
