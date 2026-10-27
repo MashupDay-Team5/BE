@@ -1,5 +1,4 @@
--- Execute once after Hibernate has created or updated the schema.
--- Re-execution is expected to fail on primary-key or unique-key conflicts.
+-- Flyway versioned migration for initial master data.
 
 INSERT INTO medical_category (medical_category_id, name) VALUES
 (1, '안과'),
