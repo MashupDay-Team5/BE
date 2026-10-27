@@ -28,7 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(properties = "spring.jpa.properties.hibernate.generate_statistics=true")
 @AutoConfigureMockMvc
 @Transactional
-@Sql(scripts = "/db/seed/master-data.sql", config = @SqlConfig(encoding = "UTF-8"))
+@Sql(scripts = "/db/migration/V2__insert_master_data.sql", config = @SqlConfig(encoding = "UTF-8"))
 class MasterDataIntegrationTest {
 
 	@Autowired
