@@ -10,7 +10,11 @@ public class CorsConfig implements WebMvcConfigurer {
 	@Override
 	public void addCorsMappings(CorsRegistry registry) {
 		registry.addMapping("/api/**")
-			.allowedOrigins("http://localhost:5173", "https://mashup-modoodoc.vercel.app")
+			.allowedOrigins(
+					"http://localhost:5173",
+					"https://mashup-modoodoc.vercel.app",
+					"https://mashup-modoodoc-preview.vercel.app"
+			)
 			.allowedMethods("GET", "HEAD", "POST")
 			.allowedHeaders("Content-Type")
 			.allowCredentials(false);
