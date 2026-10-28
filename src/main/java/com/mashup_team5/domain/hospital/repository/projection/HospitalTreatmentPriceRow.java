@@ -5,7 +5,6 @@ public record HospitalTreatmentPriceRow(
 	Long hospitalTreatmentId,
 	Long treatmentId,
 	String treatmentName,
-	Integer regularPrice,
-	Boolean isSpecialOffer
+	Integer regularPrice
 ) {
 }

@@ -75,8 +75,9 @@ class HospitalDetailControllerTest {
 				.treatmentCategory(treatmentCategory).name("라식").displayOrder(2).build());
 		unsupportedTreatment = persist(Treatment.builder()
 				.treatmentCategory(treatmentCategory).name("라섹").displayOrder(3).build());
-		hospital = persist(hospital("OO안과"));
-		noReviewHospital = persist(hospital("리뷰없는안과"));
+		hospital = persist(hospitalBuilder("OO안과").rating(new BigDecimal("4.2")).reviewCount(120)
+				.address("서울특별시 서초구 서초대로 123").build());
+		noReviewHospital = persist(hospitalBuilder("리뷰없는안과").build());
 		HospitalTreatment selectedHospitalTreatment = persist(hospitalTreatment(hospital, selectedTreatment, 1900000));
 		persist(hospitalTreatment(hospital, otherTreatment, 1700000));
 		persist(hospitalTreatment(noReviewHospital, selectedTreatment, 1800000));
@@ -111,16 +112,17 @@ class HospitalDetailControllerTest {
 				.andExpect(jsonPath("$.success").value(true))
 				.andExpect(jsonPath("$.data.hospitalId").value(hospital.getId()))
 				.andExpect(jsonPath("$.data.hospitalName").value("OO안과"))
+				.andExpect(jsonPath("$.data.address").value("서울특별시 서초구 서초대로 123"))
 				.andExpect(jsonPath("$.data.region.sidoId").value(seoul.getId()))
 				.andExpect(jsonPath("$.data.region.sidoName").value("서울특별시"))
 				.andExpect(jsonPath("$.data.region.sigunguId").value(seocho.getId()))
 				.andExpect(jsonPath("$.data.region.sigunguName").value("서초구"))
 				.andExpect(jsonPath("$.data.region.dongId").value(seochoDong.getId()))
 				.andExpect(jsonPath("$.data.region.dongName").value("서초동"))
-				.andExpect(jsonPath("$.data.rating").value(4.8))
-				.andExpect(jsonPath("$.data.totalReviewCount").value(10))
+				.andExpect(jsonPath("$.data.rating").value(4.2))
+				.andExpect(jsonPath("$.data.totalReviewCount").value(120))
 				.andExpect(jsonPath("$.data.relatedReviewCount").value(4))
-				.andExpect(jsonPath("$.data.otherReviewCount").value(6))
+				.andExpect(jsonPath("$.data.otherReviewCount").value(116))
 				.andExpect(jsonPath("$.data.treatment.treatmentId").value(selectedTreatment.getId()))
 				.andExpect(jsonPath("$.data.treatment.treatmentName").value("스마일라식"))
 				.andExpect(jsonPath("$.data.treatment.regularPrice").value(1900000))
@@ -129,7 +131,7 @@ class HospitalDetailControllerTest {
 				.andExpect(jsonPath("$.data.treatment.priceType").doesNotExist())
 				.andExpect(jsonPath("$.data.treatment.isSpecialOffer").doesNotExist());
 
-		assertThat(statistics.getPrepareStatementCount()).isEqualTo(4);
+		assertThat(statistics.getPrepareStatementCount()).isEqualTo(3);
 	}
 
 	@Test
@@ -139,6 +141,7 @@ class HospitalDetailControllerTest {
 					noReviewHospital.getId(), selectedTreatment.getId()))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.data.rating").value(0.0))
+				.andExpect(jsonPath("$.data.address").value(org.hamcrest.Matchers.nullValue()))
 				.andExpect(jsonPath("$.data.totalReviewCount").value(0))
 				.andExpect(jsonPath("$.data.relatedReviewCount").value(0))
 				.andExpect(jsonPath("$.data.otherReviewCount").value(0));
@@ -157,7 +160,7 @@ class HospitalDetailControllerTest {
 				.andExpect(jsonPath("$.data.treatment.regularPrice").value(1900000))
 				.andExpect(jsonPath("$.data.treatment.discountPrice").value(1500000));
 
-		assertThat(statistics.getPrepareStatementCount()).isEqualTo(5);
+		assertThat(statistics.getPrepareStatementCount()).isEqualTo(4);
 
 		mockMvc.perform(get("/api/hospitals/{hospitalId}/treatments/{treatmentId}",
 					hospital.getId(), selectedTreatment.getId())
@@ -201,7 +204,73 @@ class HospitalDetailControllerTest {
 				.andExpect(jsonPath("$.code").value("INVALID_ID400"));
 	}
 
-	private Hospital hospital(String name) {
+	@Test
+	@DisplayName("시술 관련 리뷰가 전체 리뷰 수보다 많아도 다른 리뷰 수는 음수가 되지 않는다")
+	void clampOtherReviewCountToZero() throws Exception {
+		entityManager.createQuery("update Hospital h set h.reviewCount = 2 where h.id = :hospitalId")
+				.setParameter("hospitalId", hospital.getId()).executeUpdate();
+		entityManager.clear();
+
+		mockMvc.perform(get("/api/hospitals/{hospitalId}/treatments/{treatmentId}",
+					hospital.getId(), selectedTreatment.getId()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.totalReviewCount").value(2))
+				.andExpect(jsonPath("$.data.relatedReviewCount").value(4))
+				.andExpect(jsonPath("$.data.otherReviewCount").value(0));
+	}
+
+	@Test
+	@DisplayName("저장된 통계가 null이어도 시술 관련 리뷰 수는 실제 데이터로 계산한다")
+	void countRelatedReviewsWithNullStatistics() throws Exception {
+		entityManager.createQuery("""
+				update Hospital h set h.rating = null, h.reviewCount = null where h.id = :hospitalId
+				""").setParameter("hospitalId", hospital.getId()).executeUpdate();
+		entityManager.clear();
+
+		mockMvc.perform(get("/api/hospitals/{hospitalId}/treatments/{treatmentId}",
+					hospital.getId(), selectedTreatment.getId()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.rating").value(0.0))
+				.andExpect(jsonPath("$.data.totalReviewCount").value(0))
+				.andExpect(jsonPath("$.data.relatedReviewCount").value(4))
+				.andExpect(jsonPath("$.data.otherReviewCount").value(0));
+	}
+
+	@Test
+	@DisplayName("여러 시술과 연결된 리뷰와 중복 연결은 선택한 시술의 리뷰 수에 한 번만 포함한다")
+	void countRelatedReviewsBySelectedTreatment() throws Exception {
+		Review review = entityManager.createQuery("select r from Review r where r.hospital.id = :hospitalId order by r.id", Review.class)
+				.setParameter("hospitalId", hospital.getId()).setMaxResults(1).getSingleResult();
+		persist(ReviewTreatment.builder().review(review).treatment(otherTreatment).build());
+		entityManager.flush();
+		entityManager.clear();
+
+		mockMvc.perform(get("/api/hospitals/{hospitalId}/treatments/{treatmentId}",
+					hospital.getId(), otherTreatment.getId()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.totalReviewCount").value(120))
+				.andExpect(jsonPath("$.data.relatedReviewCount").value(2))
+				.andExpect(jsonPath("$.data.otherReviewCount").value(118));
+	}
+
+	@Test
+	@DisplayName("실제 리뷰가 없어도 병원에 저장된 통계를 반환한다")
+	void getStoredStatisticsWithoutReviewRows() throws Exception {
+		entityManager.createQuery("""
+				update Hospital h set h.rating = 4.6, h.reviewCount = 50 where h.id = :hospitalId
+				""").setParameter("hospitalId", noReviewHospital.getId()).executeUpdate();
+		entityManager.clear();
+
+		mockMvc.perform(get("/api/hospitals/{hospitalId}/treatments/{treatmentId}",
+					noReviewHospital.getId(), selectedTreatment.getId()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.rating").value(4.6))
+				.andExpect(jsonPath("$.data.totalReviewCount").value(50))
+				.andExpect(jsonPath("$.data.relatedReviewCount").value(0))
+				.andExpect(jsonPath("$.data.otherReviewCount").value(50));
+	}
+
+	private Hospital.HospitalBuilder hospitalBuilder(String name) {
 		return Hospital.builder()
 				.region(seochoDong)
 				.name(name)
@@ -210,8 +279,7 @@ class HospitalDetailControllerTest {
 				.hasNightClinic(false)
 				.hasHolidayClinic(false)
 				.isReservable(true)
-				.monthlyVisitCount(100)
-				.build();
+				.monthlyVisitCount(100);
 	}
 
 	private HospitalTreatment hospitalTreatment(Hospital targetHospital, Treatment treatment, int regularPrice) {
@@ -219,7 +287,6 @@ class HospitalDetailControllerTest {
 				.hospital(targetHospital)
 				.treatment(treatment)
 				.regularPrice(regularPrice)
-				.isSpecialOffer(false)
 				.build();
 	}
 

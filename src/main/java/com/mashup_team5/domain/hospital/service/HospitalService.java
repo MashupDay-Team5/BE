@@ -3,13 +3,13 @@ package com.mashup_team5.domain.hospital.service;
 import com.mashup_team5.domain.hospital.dto.*;
 import com.mashup_team5.domain.hospital.dto.HospitalDetailResponse.TreatmentDetailResponse;
 import com.mashup_team5.domain.hospital.entity.Hospital;
+import com.mashup_team5.domain.hospital.enums.HospitalBadgeType;
 import com.mashup_team5.domain.hospital.enums.HospitalSort;
 import com.mashup_team5.domain.hospital.enums.PriceType;
 import com.mashup_team5.domain.hospital.repository.HospitalIdSlice;
 import com.mashup_team5.domain.hospital.repository.HospitalRepository;
 import com.mashup_team5.domain.hospital.repository.HospitalSearchCondition;
 import com.mashup_team5.domain.hospital.repository.HospitalTreatmentRepository;
-import com.mashup_team5.domain.hospital.repository.projection.HospitalReviewStatistics;
 import com.mashup_team5.domain.hospital.repository.projection.HospitalTreatmentPriceRow;
 import com.mashup_team5.domain.hospital.repository.projection.MallPriceRow;
 import com.mashup_team5.domain.mall.repository.MallPriceRepository;
@@ -21,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -46,10 +47,6 @@ public class HospitalService {
 		Map<Long, Hospital> hospitals = hospitalRepository.findAllWithRegionByIdIn(slice.hospitalIds())
 				.stream()
 				.collect(Collectors.toMap(Hospital::getId, Function.identity()));
-		Map<Long, HospitalReviewStatistics> statistics = reviewRepository
-				.findStatisticsByHospitalIds(slice.hospitalIds())
-				.stream()
-				.collect(Collectors.toMap(HospitalReviewStatistics::hospitalId, Function.identity()));
 		List<HospitalTreatmentPriceRow> priceRows = hospitalTreatmentRepository.findPriceRows(
 				slice.hospitalIds(), condition.treatmentCategoryId(), condition.treatmentId());
 		Map<Long, List<HospitalTreatmentPriceRow>> priceRowsByHospital = priceRows.stream()
@@ -59,7 +56,6 @@ public class HospitalService {
 		List<HospitalResponse> content = slice.hospitalIds().stream()
 				.map(hospitalId -> toResponse(
 						hospitals.get(hospitalId),
-						statistics.get(hospitalId),
 						priceRowsByHospital.getOrDefault(hospitalId, List.of()),
 						mallPrices,
 						condition))
@@ -80,18 +76,16 @@ public class HospitalService {
 				.findPriceRows(List.of(hospitalId), null, treatmentId).stream()
 				.findFirst()
 				.orElseThrow(() -> new CustomException(ErrorCode.HOSPITAL_TREATMENT_NOT_FOUND));
-		HospitalReviewStatistics statistics = reviewRepository.findStatisticsByHospitalIds(List.of(hospitalId)).stream()
-				.findFirst()
-				.orElse(null);
-		long totalReviewCount = reviewCount(statistics);
+		long totalReviewCount = reviewCount(hospital);
 		long relatedReviewCount = reviewRepository.countMatchingReviews(hospitalId, treatmentId, true);
-		long otherReviewCount = totalReviewCount - relatedReviewCount;
+		long otherReviewCount = Math.max(totalReviewCount - relatedReviewCount, 0L);
 		Integer discountPrice = findMallPrices(mallId, List.of(priceRow)).get(priceRow.hospitalTreatmentId());
 		return new HospitalDetailResponse(
 				hospital.getId(),
 				hospital.getName(),
+				hospital.getAddress(),
 				toRegionResponse(hospital.getRegion()),
-				rating(statistics),
+				rating(hospital),
 				totalReviewCount,
 				relatedReviewCount,
 				otherReviewCount,
@@ -130,21 +124,21 @@ public class HospitalService {
 
 	private HospitalResponse toResponse(
 			Hospital hospital,
-			HospitalReviewStatistics statistics,
 			List<HospitalTreatmentPriceRow> priceRows,
 			Map<Long, Integer> mallPrices,
 			HospitalSearchCondition condition) {
 		return new HospitalResponse(
 				hospital.getId(),
 				hospital.getName(),
+				hospital.getAddress(),
 				toRegionResponse(hospital.getRegion()),
-				rating(statistics),
-				reviewCount(statistics),
+				rating(hospital),
+				reviewCount(hospital),
 				hospital.getHasSpecialist(),
 				hospital.getHasPublicPrice(),
 				hospital.getHasNightClinic(),
 				hospital.getHasHolidayClinic(),
-				hospital.getIsReservable(),
+				badgeTypes(hospital),
 				priceRows.stream()
 						.map(row -> toPriceResponse(row, mallPrices))
 						.filter(price -> isInPriceRange(price.displayPrice(), condition))
@@ -152,14 +146,32 @@ public class HospitalService {
 		);
 	}
 
-	private double rating(HospitalReviewStatistics statistics) {
-		return statistics == null || statistics.rating() == null
-				? 0.0
-				: Math.round(statistics.rating() * 10) / 10.0;
+	private double rating(Hospital hospital) {
+		return hospital.getRating() == null ? 0.0 : hospital.getRating().doubleValue();
 	}
 
-	private long reviewCount(HospitalReviewStatistics statistics) {
-		return statistics == null ? 0L : statistics.reviewCount();
+	private long reviewCount(Hospital hospital) {
+		return hospital.getReviewCount() == null ? 0L : hospital.getReviewCount();
+	}
+
+	private List<HospitalBadgeType> badgeTypes(Hospital hospital) {
+		List<HospitalBadgeType> badges = new ArrayList<>();
+		if (Boolean.TRUE.equals(hospital.getIsPopular())) {
+			badges.add(HospitalBadgeType.POPULAR);
+		}
+		if (Boolean.TRUE.equals(hospital.getHasNightClinic())) {
+			badges.add(HospitalBadgeType.NIGHT_CLINIC);
+		}
+		if (Boolean.TRUE.equals(hospital.getIsReservable())) {
+			badges.add(HospitalBadgeType.SAME_DAY_BOOKING);
+		}
+		if (Boolean.TRUE.equals(hospital.getIsOpenToday())) {
+			badges.add(HospitalBadgeType.OPEN_TODAY);
+		}
+		if (Boolean.TRUE.equals(hospital.getHasSpecialOffer())) {
+			badges.add(HospitalBadgeType.SPECIAL_OFFER);
+		}
+		return List.copyOf(badges);
 	}
 
 	private void validateIds(Long hospitalId, Long treatmentId) {
@@ -210,8 +222,7 @@ public class HospitalService {
 				row.regularPrice(),
 				discountPrice,
 				discountPrice == null ? row.regularPrice() : discountPrice,
-				discountPrice == null ? PriceType.REGULAR : PriceType.MALL,
-				row.isSpecialOffer()
+				discountPrice == null ? PriceType.REGULAR : PriceType.MALL
 		);
 	}
 }

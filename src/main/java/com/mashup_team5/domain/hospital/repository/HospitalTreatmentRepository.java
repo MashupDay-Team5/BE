@@ -14,7 +14,7 @@ public interface HospitalTreatmentRepository extends JpaRepository<HospitalTreat
 
 	@Query("""
 		select new com.mashup_team5.domain.hospital.repository.projection.HospitalTreatmentPriceRow(
-			ht.hospital.id, ht.id, t.id, t.name, ht.regularPrice, ht.isSpecialOffer
+			ht.hospital.id, ht.id, t.id, t.name, ht.regularPrice
 		)
 		from HospitalTreatment ht
 		join ht.treatment t

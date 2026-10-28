@@ -58,11 +58,30 @@ public class Hospital {
 	@Column(name = "monthly_visit_count")
 	private Integer monthlyVisitCount;
 
+	@Column(name = "rating", precision = 3, scale = 1)
+	private BigDecimal rating;
+
+	@Column(name = "review_count")
+	private Integer reviewCount;
+
+	@Column(name = "is_popular")
+	private Boolean isPopular;
+
+	@Column(name = "is_open_today")
+	private Boolean isOpenToday;
+
+	@Column(name = "has_special_offer")
+	private Boolean hasSpecialOffer;
+
+	@Column(name = "address")
+	private String address;
+
 	@Builder
 	public Hospital(
 		Region region, String name, BigDecimal latitude, BigDecimal longitude, Boolean hasSpecialist,
 		Boolean hasPublicPrice, Boolean hasNightClinic, Boolean hasHolidayClinic, Boolean isReservable,
-		Integer monthlyVisitCount) {
+		Integer monthlyVisitCount, BigDecimal rating, Integer reviewCount, Boolean isPopular,
+		Boolean isOpenToday, Boolean hasSpecialOffer, String address) {
 		this.region = region;
 		this.name = name;
 		this.latitude = latitude;
@@ -73,5 +92,11 @@ public class Hospital {
 		this.hasHolidayClinic = hasHolidayClinic;
 		this.isReservable = isReservable;
 		this.monthlyVisitCount = monthlyVisitCount;
+		this.rating = rating;
+		this.reviewCount = reviewCount;
+		this.isPopular = isPopular;
+		this.isOpenToday = isOpenToday;
+		this.hasSpecialOffer = hasSpecialOffer;
+		this.address = address;
 	}
 }

@@ -453,14 +453,14 @@ class ReviewKeywordServiceTest {
 	}
 
 	@Test
-	@DisplayName("키워드 처리 중 변경된 정상가와 특가 여부는 덮어쓰지 않는다")
+	@DisplayName("키워드 처리 중 변경된 정상가는 덮어쓰지 않는다")
 	void preservesHospitalTreatmentFieldsChangedDuringExtraction() {
 		createReviews(10);
 		when(extractionService.extractKeywords(anyList())).thenAnswer(invocation -> {
 			transactionTemplate.executeWithoutResult(status ->
 				entityManager.createQuery("""
 					update HospitalTreatment ht
-					set ht.regularPrice = 150000, ht.isSpecialOffer = true
+					set ht.regularPrice = 150000
 					where ht.id = :id
 					""").setParameter("id", target.getId()).executeUpdate());
 			return List.of("친절해요");
@@ -470,7 +470,6 @@ class ReviewKeywordServiceTest {
 		HospitalTreatment saved = transactionTemplate.execute(status ->
 			entityManager.find(HospitalTreatment.class, target.getId()));
 		assertThat(saved.getRegularPrice()).isEqualTo(150000);
-		assertThat(saved.getIsSpecialOffer()).isTrue();
 		assertThat(findState().getUpdatedAt()).isNotNull();
 	}
 

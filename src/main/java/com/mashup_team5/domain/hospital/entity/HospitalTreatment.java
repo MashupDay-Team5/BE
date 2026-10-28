@@ -40,15 +40,11 @@ public class HospitalTreatment {
 	@Column(name = "regular_price")
 	private Integer regularPrice;
 
-	@Column(name = "is_special_offer")
-	private Boolean isSpecialOffer;
-
 	@Builder
 	public HospitalTreatment(
-		Hospital hospital, Treatment treatment, Integer regularPrice, Boolean isSpecialOffer) {
+		Hospital hospital, Treatment treatment, Integer regularPrice) {
 		this.hospital = hospital;
 		this.treatment = treatment;
 		this.regularPrice = regularPrice;
-		this.isSpecialOffer = isSpecialOffer;
 	}
 }

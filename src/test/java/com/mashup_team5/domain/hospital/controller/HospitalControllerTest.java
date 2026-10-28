@@ -17,6 +17,8 @@ import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -93,10 +95,15 @@ class HospitalControllerTest {
 				.treatmentCategory(skinTreatment).name("보톡스").displayOrder(1).build());
 		mall = persist(Mall.builder().name("테스트몰").build());
 
-		firstHospital = persist(hospital("가병원", gangnamDong, true, true, true, true, 100));
-		secondHospital = persist(hospital("나병원", seochoDong, false, true, true, false, 100));
-		thirdHospital = persist(hospital("다병원", seongnamDong, true, false, false, true, 50));
-		fourthHospital = persist(hospital("라병원", gangnamDong, false, false, false, false, null));
+		firstHospital = persist(hospitalBuilder("가병원", gangnamDong, true, true, true, true, 100)
+				.rating(new BigDecimal("4.7")).reviewCount(120).isPopular(true).isOpenToday(true)
+				.hasSpecialOffer(true).address("서울특별시 강남구 테헤란로 123").build());
+		secondHospital = persist(hospitalBuilder("나병원", seochoDong, false, true, true, false, 100)
+				.rating(new BigDecimal("3.9")).reviewCount(300).isPopular(false).isOpenToday(false)
+				.hasSpecialOffer(false).build());
+		thirdHospital = persist(hospitalBuilder("다병원", seongnamDong, true, false, false, true, 50)
+				.rating(new BigDecimal("4.7")).reviewCount(120).build());
+		fourthHospital = persist(hospitalBuilder("라병원", gangnamDong, false, false, false, false, null).build());
 
 		HospitalTreatment firstLasik = persist(hospitalTreatment(firstHospital, lasik, 100000));
 		persist(hospitalTreatment(firstHospital, botox, 15000000));
@@ -131,14 +138,17 @@ class HospitalControllerTest {
 				.andExpect(jsonPath("$.data.page").value(0))
 				.andExpect(jsonPath("$.data.size").value(2))
 				.andExpect(jsonPath("$.data.hasNext").value(true))
-				.andExpect(jsonPath("$.data.content[0].rating").value(4.5))
-				.andExpect(jsonPath("$.data.content[0].reviewCount").value(2))
+				.andExpect(jsonPath("$.data.content[0].rating").value(4.7))
+				.andExpect(jsonPath("$.data.content[0].reviewCount").value(120))
+				.andExpect(jsonPath("$.data.content[0].address").value("서울특별시 강남구 테헤란로 123"))
 				.andExpect(jsonPath("$.data.content[0].region.sidoName").value("서울"))
 				.andExpect(jsonPath("$.data.content[0].region.sigunguName").value("강남구"))
 				.andExpect(jsonPath("$.data.content[0].region.dongName").value("역삼동"))
 				.andExpect(jsonPath("$.data.content[0].treatments.length()").value(2));
 
-		org.assertj.core.api.Assertions.assertThat(statistics.getPrepareStatementCount()).isEqualTo(4);
+		org.assertj.core.api.Assertions.assertThat(statistics.getPrepareStatementCount()).isEqualTo(3);
+		org.assertj.core.api.Assertions.assertThat(statistics.getQueries())
+				.noneMatch(query -> query.contains("from Review"));
 
 		mockMvc.perform(get("/api/hospitals").param("page", "1").param("size", "2"))
 				.andExpect(status().isOk())
@@ -283,7 +293,7 @@ class HospitalControllerTest {
 				.andExpect(jsonPath("$.data.content[0].treatments[0].discountPrice").value(70000))
 				.andExpect(jsonPath("$.data.content[0].treatments[0].displayPrice").value(70000))
 				.andExpect(jsonPath("$.data.content[0].treatments[0].priceType").value("MALL"));
-		org.assertj.core.api.Assertions.assertThat(statistics.getPrepareStatementCount()).isEqualTo(5);
+		org.assertj.core.api.Assertions.assertThat(statistics.getPrepareStatementCount()).isEqualTo(4);
 
 		mockMvc.perform(get("/api/hospitals")
 						.param("treatmentCategoryId", visionCorrection.getId().toString())
@@ -308,9 +318,9 @@ class HospitalControllerTest {
 	@DisplayName("평점, 리뷰 수, 방문 수, 낮은 가격 정렬과 ID tie-breaker를 적용한다")
 	void sortHospitals() throws Exception {
 		assertHospitalIds(get("/api/hospitals").param("sort", "RATING"),
-				secondHospital, firstHospital, thirdHospital, fourthHospital);
-		assertHospitalIds(get("/api/hospitals").param("sort", "REVIEW_COUNT"),
 				firstHospital, thirdHospital, secondHospital, fourthHospital);
+		assertHospitalIds(get("/api/hospitals").param("sort", "REVIEW_COUNT"),
+				secondHospital, firstHospital, thirdHospital, fourthHospital);
 		assertHospitalIds(get("/api/hospitals").param("sort", "VISIT"),
 				firstHospital, secondHospital, thirdHospital, fourthHospital);
 		assertHospitalIds(get("/api/hospitals")
@@ -397,7 +407,7 @@ class HospitalControllerTest {
 		mockMvc.perform(get("/api/hospitals"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.data.content.length()").value(4))
-				.andExpect(jsonPath("$.data.content[0].reviewCount").value(2));
+				.andExpect(jsonPath("$.data.content[0].reviewCount").value(120));
 		mockMvc.perform(get("/api/hospitals/count"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.data").value(4));
@@ -409,22 +419,154 @@ class HospitalControllerTest {
 	}
 
 	@Test
-	@DisplayName("평점은 소수 첫째 자리로 반올림한다")
-	void roundRating() throws Exception {
+	@DisplayName("실제 리뷰가 추가되어도 병원에 저장된 평점과 리뷰 수를 반환한다")
+	void useStoredStatisticsRegardlessOfReviews() throws Exception {
 		persist(review(secondHospital, "4.0"));
 		persist(review(secondHospital, "4.0"));
 		entityManager.flush();
 		entityManager.clear();
 
-		// 나병원 리뷰: 5.0, 4.0, 4.0 → 평균 4.333... → 4.3
 		mockMvc.perform(get("/api/hospitals")
 						.param("regionIds", seocho.getId().toString()))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.data.content[0].hospitalId").value(secondHospital.getId()))
-				.andExpect(jsonPath("$.data.content[0].rating").value(4.3));
+				.andExpect(jsonPath("$.data.content[0].rating").value(3.9))
+				.andExpect(jsonPath("$.data.content[0].reviewCount").value(300));
 	}
 
-	private Hospital hospital(
+	@Test
+	@DisplayName("병원 필드만으로 다섯 배지를 조립하고 시술 검색에도 유지한다")
+	void getHospitalBadges() throws Exception {
+		Statistics statistics = statistics();
+		statistics.clear();
+
+		mockMvc.perform(get("/api/hospitals"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.content[0].badgeTypes").value(contains(
+						"POPULAR", "NIGHT_CLINIC", "SAME_DAY_BOOKING", "OPEN_TODAY", "SPECIAL_OFFER")))
+				.andExpect(jsonPath("$.data.content[1].badgeTypes")
+						.value(contains("NIGHT_CLINIC", "SAME_DAY_BOOKING")))
+				.andExpect(jsonPath("$.data.content[2].badgeTypes").value(contains("SAME_DAY_BOOKING")))
+				.andExpect(jsonPath("$.data.content[*].isReservable").doesNotExist())
+				.andExpect(jsonPath("$.data.content[*].treatments[*].isSpecialOffer").doesNotExist());
+
+		org.assertj.core.api.Assertions.assertThat(statistics.getPrepareStatementCount()).isEqualTo(3);
+		mockMvc.perform(get("/api/hospitals").param("treatmentId", botox.getId().toString()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.content[0].badgeTypes")
+						.value(contains("POPULAR", "NIGHT_CLINIC", "SAME_DAY_BOOKING", "OPEN_TODAY", "SPECIAL_OFFER")));
+	}
+
+	@Test
+	@DisplayName("할인 가격이 있어도 병원 특가 배지가 false이면 특가 배지를 반환하지 않는다")
+	void excludeSpecialOfferBadgeDespiteDiscountPrice() throws Exception {
+		HospitalTreatment hospitalTreatment = entityManager.createQuery("""
+				select ht from HospitalTreatment ht
+				where ht.hospital.id = :hospitalId and ht.treatment.id = :treatmentId
+				""", HospitalTreatment.class)
+				.setParameter("hospitalId", secondHospital.getId())
+				.setParameter("treatmentId", lasik.getId()).getSingleResult();
+		persist(MallPrice.builder().hospitalTreatment(hospitalTreatment).mall(mall).price(60000).build());
+		entityManager.flush();
+		entityManager.clear();
+
+		mockMvc.perform(get("/api/hospitals").param("regionIds", seocho.getId().toString())
+						.param("treatmentId", lasik.getId().toString()).param("mallId", mall.getId().toString()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.content[0].hospitalId").value(secondHospital.getId()))
+				.andExpect(jsonPath("$.data.content[0].treatments[0].discountPrice").value(60000))
+				.andExpect(jsonPath("$.data.content[0].treatments[0].displayPrice").value(60000))
+				.andExpect(jsonPath("$.data.content[0].treatments[0].priceType").value("MALL"))
+				.andExpect(jsonPath("$.data.content[0].badgeTypes").value(contains("NIGHT_CLINIC", "SAME_DAY_BOOKING")));
+	}
+
+	@Test
+	@DisplayName("할인 가격이 없어도 병원 특가 배지가 true이면 특가 배지를 반환한다")
+	void includeSpecialOfferBadgeWithoutDiscountPrice() throws Exception {
+		mockMvc.perform(get("/api/hospitals").param("treatmentId", botox.getId().toString())
+						.param("mallId", mall.getId().toString()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.content[0].hospitalId").value(firstHospital.getId()))
+				.andExpect(jsonPath("$.data.content[0].treatments[0].discountPrice").doesNotExist())
+				.andExpect(jsonPath("$.data.content[0].treatments[0].displayPrice").value(15000000))
+				.andExpect(jsonPath("$.data.content[0].treatments[0].priceType").value("REGULAR"))
+				.andExpect(jsonPath("$.data.content[0].badgeTypes").value(contains(
+						"POPULAR", "NIGHT_CLINIC", "SAME_DAY_BOOKING", "OPEN_TODAY", "SPECIAL_OFFER")));
+	}
+
+	@Test
+	@DisplayName("조회할 시술상품이 없어도 병원 특가 배지를 반환한다")
+	void includeSpecialOfferBadgeWithoutTreatments() throws Exception {
+		Hospital hospital = persist(Hospital.builder().region(seoul).name("특가 병원")
+				.hasSpecialOffer(true).monthlyVisitCount(1000).build());
+		entityManager.flush();
+		entityManager.clear();
+
+		mockMvc.perform(get("/api/hospitals").param("size", "1"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.content[0].hospitalId").value(hospital.getId()))
+				.andExpect(jsonPath("$.data.content[0].treatments").isEmpty())
+				.andExpect(jsonPath("$.data.content[0].badgeTypes").value(contains("SPECIAL_OFFER")));
+	}
+
+	@ParameterizedTest
+	@CsvSource({
+			"true, false, false, false, false, POPULAR",
+			"false, true, false, false, false, NIGHT_CLINIC",
+			"false, false, true, false, false, SAME_DAY_BOOKING",
+			"false, false, false, true, false, OPEN_TODAY",
+			"false, false, false, false, true, SPECIAL_OFFER"
+	})
+	@DisplayName("각 원본 필드가 true인 경우에만 대응하는 배지를 반환한다")
+	void mapEachBadgeIndependently(
+			boolean popular, boolean nightClinic, boolean reservable, boolean openToday,
+			boolean specialOffer, String expectedBadge) throws Exception {
+		Hospital hospital = persist(Hospital.builder().region(seoul).name("단일 배지 병원")
+				.isPopular(popular).hasNightClinic(nightClinic).isReservable(reservable)
+				.isOpenToday(openToday).hasSpecialOffer(specialOffer).monthlyVisitCount(1000).build());
+		persist(HospitalTreatment.builder().hospital(hospital).treatment(lasik).build());
+		entityManager.flush();
+		entityManager.clear();
+
+		mockMvc.perform(get("/api/hospitals").param("size", "1"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.content[0].hospitalId").value(hospital.getId()))
+				.andExpect(jsonPath("$.data.content[0].badgeTypes").value(contains(expectedBadge)));
+	}
+
+	@Test
+	@DisplayName("신규 필드와 배지 원본 값이 null이면 통계는 0, 배지는 빈 목록을 반환한다")
+	void getHospitalsWithNullFields() throws Exception {
+		Hospital legacyHospital = persist(Hospital.builder().region(seocho).name("기존 병원").build());
+		persist(HospitalTreatment.builder().hospital(legacyHospital).treatment(lasik).build());
+		persist(review(legacyHospital, "5.0"));
+		entityManager.flush();
+		entityManager.clear();
+
+		mockMvc.perform(get("/api/hospitals").param("page", "4").param("size", "1"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.content[0].hospitalId").value(legacyHospital.getId()))
+				.andExpect(jsonPath("$.data.content[0].rating").value(0.0))
+				.andExpect(jsonPath("$.data.content[0].reviewCount").value(0))
+				.andExpect(jsonPath("$.data.content[0].address").value(org.hamcrest.Matchers.nullValue()))
+				.andExpect(jsonPath("$.data.content[0].badgeTypes").isEmpty());
+	}
+
+	@Test
+	@DisplayName("평점과 리뷰 수 정렬에서 null과 0은 동률로 ID 순서를 유지한다")
+	void sortNullStatisticsAsZero() throws Exception {
+		Hospital zeroHospital = persist(Hospital.builder().region(seocho).name("통계 0 병원")
+				.rating(BigDecimal.ZERO).reviewCount(0).build());
+		entityManager.flush();
+		entityManager.clear();
+
+		assertHospitalIds(get("/api/hospitals").param("sort", "RATING"),
+				firstHospital, thirdHospital, secondHospital, fourthHospital, zeroHospital);
+		assertHospitalIds(get("/api/hospitals").param("sort", "REVIEW_COUNT"),
+				secondHospital, firstHospital, thirdHospital, fourthHospital, zeroHospital);
+	}
+
+	private Hospital.HospitalBuilder hospitalBuilder(
 			String name,
 			Region region,
 			boolean hasSpecialist,
@@ -440,8 +582,7 @@ class HospitalControllerTest {
 				.hasNightClinic(hasNightClinic)
 				.hasHolidayClinic(hasHolidayClinic)
 				.isReservable(true)
-				.monthlyVisitCount(monthlyVisitCount)
-				.build();
+				.monthlyVisitCount(monthlyVisitCount);
 	}
 
 	private HospitalTreatment hospitalTreatment(Hospital hospital, Treatment treatment, int regularPrice) {
@@ -449,7 +590,6 @@ class HospitalControllerTest {
 				.hospital(hospital)
 				.treatment(treatment)
 				.regularPrice(regularPrice)
-				.isSpecialOffer(false)
 				.build();
 	}
 
