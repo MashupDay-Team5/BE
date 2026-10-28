@@ -3,6 +3,7 @@ package com.mashup_team5.domain.hospital.dto;
 public record HospitalDetailResponse(
 	Long hospitalId,
 	String hospitalName,
+	String address,
 	HospitalRegionResponse region,
 	double rating,
 	long totalReviewCount,

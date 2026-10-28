@@ -9,7 +9,6 @@ public record TreatmentPriceResponse(
         Integer regularPrice,
         Integer discountPrice,
         Integer displayPrice,
-        PriceType priceType,
-        Boolean isSpecialOffer
+        PriceType priceType
 ) {
 }
