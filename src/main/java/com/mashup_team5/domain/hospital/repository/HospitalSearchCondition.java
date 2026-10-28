@@ -5,8 +5,9 @@ import com.mashup_team5.domain.hospital.enums.HospitalSort;
 import java.util.List;
 
 public record HospitalSearchCondition(
+        Long medicalCategoryId,
         Long treatmentCategoryId,
-        Long treatmentId,
+        List<Long> treatmentIds,
         List<Long> regionIds,
         Integer minPrice,
         Integer maxPrice,
@@ -19,4 +20,8 @@ public record HospitalSearchCondition(
         int page,
         int size
 ) {
+	public HospitalSearchCondition {
+		treatmentIds = treatmentIds == null ? List.of() : treatmentIds.stream().distinct().toList();
+		regionIds = regionIds == null ? List.of() : regionIds.stream().distinct().toList();
+	}
 }

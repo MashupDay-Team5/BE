@@ -19,6 +19,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -27,6 +28,9 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
+import org.springframework.util.LinkedMultiValueMap;
 
 import static org.hamcrest.Matchers.contains;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -60,6 +64,7 @@ class HospitalControllerTest {
 	private Treatment smileLasik;
 	private Treatment botox;
 	private Mall mall;
+	private MedicalCategory medicalCategory;
 	private Hospital firstHospital;
 	private Hospital secondHospital;
 	private Hospital thirdHospital;
@@ -82,7 +87,7 @@ class HospitalControllerTest {
 		Region seongnamDong = persist(Region.builder()
 				.parentRegion(seongnam).name("정자동").regionType(RegionType.DONG).build());
 
-		MedicalCategory medicalCategory = persist(MedicalCategory.builder().name("테스트 진료").build());
+		medicalCategory = persist(MedicalCategory.builder().name("테스트 진료").build());
 		visionCorrection = persist(TreatmentCategory.builder()
 				.medicalCategory(medicalCategory).name("시력교정술").build());
 		skinTreatment = persist(TreatmentCategory.builder()
@@ -163,7 +168,7 @@ class HospitalControllerTest {
 	void filterByTreatmentAndRegions() throws Exception {
 		assertHospitalIds(get("/api/hospitals")
 						.param("treatmentCategoryId", visionCorrection.getId().toString())
-						.param("treatmentId", lasik.getId().toString()),
+						.param("treatmentIds", lasik.getId().toString()),
 				firstHospital, secondHospital);
 		assertHospitalIds(get("/api/hospitals").param("regionIds", seoul.getId().toString()),
 				firstHospital, secondHospital, fourthHospital);
@@ -191,7 +196,7 @@ class HospitalControllerTest {
 
 		mockMvc.perform(get("/api/hospitals")
 						.param("treatmentCategoryId", visionCorrection.getId().toString())
-						.param("treatmentId", lasik.getId().toString()))
+						.param("treatmentIds", lasik.getId().toString()))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.data.content[*].hospitalId").value(contains(
 						firstHospital.getId().intValue(), secondHospital.getId().intValue())))
@@ -200,9 +205,9 @@ class HospitalControllerTest {
 
 		mockMvc.perform(get("/api/hospitals")
 						.param("treatmentCategoryId", skinTreatment.getId().toString())
-						.param("treatmentId", lasik.getId().toString()))
-				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.data.content").isEmpty());
+						.param("treatmentIds", lasik.getId().toString()))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("CATEGORY_MISMATCH"));
 	}
 
 	@Test
@@ -228,15 +233,15 @@ class HospitalControllerTest {
 	void filterByRegularPrice() throws Exception {
 		assertHospitalIds(get("/api/hospitals")
 				.param("treatmentCategoryId", visionCorrection.getId().toString())
-				.param("treatmentId", lasik.getId().toString())
+				.param("treatmentIds", lasik.getId().toString())
 				.param("minPrice", "120000"), secondHospital);
 		assertHospitalIds(get("/api/hospitals")
 				.param("treatmentCategoryId", visionCorrection.getId().toString())
-				.param("treatmentId", lasik.getId().toString())
+				.param("treatmentIds", lasik.getId().toString())
 				.param("maxPrice", "120000"), firstHospital);
 		assertHospitalIds(get("/api/hospitals")
 				.param("treatmentCategoryId", visionCorrection.getId().toString())
-				.param("treatmentId", lasik.getId().toString())
+				.param("treatmentIds", lasik.getId().toString())
 				.param("minPrice", "90000")
 				.param("maxPrice", "120000"), firstHospital);
 		assertHospitalIds(get("/api/hospitals")
@@ -260,16 +265,16 @@ class HospitalControllerTest {
 	@DisplayName("시술과 몰 가격 범위를 적용하고 몰 가격이 있으면 정상가로 대체하지 않는다")
 	void filterByTreatmentAndEffectiveMallPriceRange() throws Exception {
 		assertHospitalIds(get("/api/hospitals")
-				.param("treatmentId", lasik.getId().toString())
+				.param("treatmentIds", lasik.getId().toString())
 				.param("minPrice", "90000")
 				.param("maxPrice", "120000"), firstHospital);
 		assertHospitalIds(get("/api/hospitals")
-				.param("treatmentId", lasik.getId().toString())
+				.param("treatmentIds", lasik.getId().toString())
 				.param("mallId", mall.getId().toString())
 				.param("minPrice", "60000")
 				.param("maxPrice", "80000"), firstHospital);
 		assertHospitalIds(get("/api/hospitals")
-				.param("treatmentId", lasik.getId().toString())
+				.param("treatmentIds", lasik.getId().toString())
 				.param("mallId", mall.getId().toString())
 				.param("minPrice", "100000")
 				.param("maxPrice", "160000"), secondHospital);
@@ -283,7 +288,7 @@ class HospitalControllerTest {
 
 		mockMvc.perform(get("/api/hospitals")
 						.param("treatmentCategoryId", visionCorrection.getId().toString())
-						.param("treatmentId", lasik.getId().toString())
+						.param("treatmentIds", lasik.getId().toString())
 						.param("mallId", mall.getId().toString())
 						.param("maxPrice", "80000"))
 				.andExpect(status().isOk())
@@ -293,11 +298,11 @@ class HospitalControllerTest {
 				.andExpect(jsonPath("$.data.content[0].treatments[0].discountPrice").value(70000))
 				.andExpect(jsonPath("$.data.content[0].treatments[0].displayPrice").value(70000))
 				.andExpect(jsonPath("$.data.content[0].treatments[0].priceType").value("MALL"));
-		org.assertj.core.api.Assertions.assertThat(statistics.getPrepareStatementCount()).isEqualTo(4);
+		org.assertj.core.api.Assertions.assertThat(statistics.getPrepareStatementCount()).isEqualTo(7);
 
 		mockMvc.perform(get("/api/hospitals")
 						.param("treatmentCategoryId", visionCorrection.getId().toString())
-						.param("treatmentId", lasik.getId().toString())
+						.param("treatmentIds", lasik.getId().toString())
 						.param("mallId", mall.getId().toString())
 						.param("minPrice", "100000")
 						.param("maxPrice", "160000"))
@@ -326,20 +331,20 @@ class HospitalControllerTest {
 		assertHospitalIds(get("/api/hospitals")
 				.param("sort", "LOW_PRICE")
 				.param("treatmentCategoryId", visionCorrection.getId().toString())
-				.param("treatmentId", lasik.getId().toString())
+				.param("treatmentIds", lasik.getId().toString())
 				.param("mallId", mall.getId().toString()), firstHospital, secondHospital);
 	}
 
 	@Test
 	@DisplayName("잘못된 가격 범위, 낮은 가격 정렬 조건, 페이지, 지역 개수 요청은 Bad Request로 처리한다")
 	void rejectInvalidConditions() throws Exception {
-		assertBadRequest(get("/api/hospitals").param("minPrice", "200").param("maxPrice", "100"), "INVALID_PRICE_RANGE400");
-		assertBadRequest(get("/api/hospitals").param("sort", "LOW_PRICE"), "TREATMENT_REQUIRED_FOR_PRICE_SORT400");
-		assertBadRequest(get("/api/hospitals").param("sort", "SATISFACTION"));
+		assertBadRequest(get("/api/hospitals").param("minPrice", "200").param("maxPrice", "100"), "INVALID_PRICE_RANGE");
+		assertBadRequest(get("/api/hospitals").param("sort", "LOW_PRICE"), "SORT_REQUIRES_TREATMENT");
+		assertBadRequest(get("/api/hospitals").param("sort", "SATISFACTION"), "INVALID_SORT");
 		assertBadRequest(get("/api/hospitals").param("minPrice", "-1"));
 		assertBadRequest(get("/api/hospitals").param("maxPrice", "15000001"));
-		assertBadRequest(get("/api/hospitals").param("page", "-1"));
-		assertBadRequest(get("/api/hospitals").param("size", "51"));
+		assertBadRequest(get("/api/hospitals").param("page", "-1"), "INVALID_PAGINATION");
+		assertBadRequest(get("/api/hospitals").param("size", "51"), "INVALID_PAGINATION");
 
 		MockHttpServletRequestBuilder tooManyRegions = get("/api/hospitals");
 		for (long id = 1; id <= 6; id++) {
@@ -382,7 +387,7 @@ class HospitalControllerTest {
 						.param("regionIds", seoul.getId().toString()))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.data").value(1));
-		org.assertj.core.api.Assertions.assertThat(statistics.getPrepareStatementCount()).isEqualTo(1);
+		org.assertj.core.api.Assertions.assertThat(statistics.getPrepareStatementCount()).isEqualTo(2);
 
 		statistics.clear();
 		mockMvc.perform(get("/api/hospitals")
@@ -391,14 +396,278 @@ class HospitalControllerTest {
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.data.content").isEmpty())
 				.andExpect(jsonPath("$.data.hasNext").value(false));
-		org.assertj.core.api.Assertions.assertThat(statistics.getPrepareStatementCount()).isEqualTo(1);
+		org.assertj.core.api.Assertions.assertThat(statistics.getPrepareStatementCount()).isEqualTo(2);
+		entityManager.clear();
 		statistics.clear();
 		mockMvc.perform(get("/api/hospitals/count")
 						.param("treatmentCategoryId", visionCorrection.getId().toString())
 						.param("minPrice", "1000000"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.data").value(0));
-		org.assertj.core.api.Assertions.assertThat(statistics.getPrepareStatementCount()).isEqualTo(1);
+		org.assertj.core.api.Assertions.assertThat(statistics.getPrepareStatementCount()).isEqualTo(2);
+	}
+
+	@Test
+	@DisplayName("진료과목 전체 선택은 하위 시술만 조회하고 다른 진료과목 병원을 제외한다")
+	void filterByMedicalCategory() throws Exception {
+		MedicalCategory otherMedical = persist(MedicalCategory.builder().name("다른 진료").build());
+		TreatmentCategory otherCategory = persist(TreatmentCategory.builder()
+				.medicalCategory(otherMedical).name("다른 카테고리").build());
+		Treatment otherTreatment = persist(Treatment.builder().treatmentCategory(otherCategory).name("다른 시술").build());
+		Hospital otherHospital = persist(Hospital.builder().region(seoul).name("다른 진료 병원").build());
+		persist(hospitalTreatment(otherHospital, otherTreatment, 10000));
+		persist(hospitalTreatment(firstHospital, otherTreatment, 10000));
+		entityManager.flush();
+		entityManager.clear();
+
+		assertSearchAndCount(Map.of("medicalCategoryId", List.of(medicalCategory.getId().toString())),
+				firstHospital, secondHospital, thirdHospital, fourthHospital);
+		mockMvc.perform(get("/api/hospitals").param("medicalCategoryId", medicalCategory.getId().toString()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.content[0].treatments[*].treatmentId")
+						.value(contains(lasik.getId().intValue(), botox.getId().intValue())));
+	}
+
+	@Test
+	@DisplayName("복수 시술은 OR로 조회하고 모든 상위 조건 및 지역·진료 필터를 함께 적용한다")
+	void filterByMultipleTreatmentsAndParents() throws Exception {
+		assertSearchAndCount(Map.of(
+				"medicalCategoryId", List.of(medicalCategory.getId().toString()),
+				"treatmentCategoryId", List.of(visionCorrection.getId().toString())),
+				firstHospital, secondHospital, fourthHospital);
+		assertSearchAndCount(Map.of("treatmentIds", List.of(lasik.getId().toString(), botox.getId().toString())),
+				firstHospital, secondHospital, thirdHospital);
+		assertSearchAndCount(Map.of(
+				"medicalCategoryId", List.of(medicalCategory.getId().toString()),
+				"treatmentCategoryId", List.of(visionCorrection.getId().toString()),
+				"treatmentIds", List.of(lasik.getId().toString(), smileLasik.getId().toString())),
+				firstHospital, secondHospital, fourthHospital);
+		assertSearchAndCount(Map.of(
+				"medicalCategoryId", List.of(medicalCategory.getId().toString()),
+				"treatmentIds", List.of(lasik.getId().toString(), botox.getId().toString()),
+				"regionIds", List.of(seoul.getId().toString(), seongnam.getId().toString()),
+				"hasSpecialist", List.of("true"), "hasNightClinic", List.of("true")), firstHospital);
+	}
+
+	@Test
+	@DisplayName("중복 시술은 한 번만 검증하고 병원과 시술 응답을 중복시키지 않는다")
+	void deduplicateTreatmentIds() throws Exception {
+		Statistics statistics = statistics();
+		statistics.clear();
+		mockMvc.perform(get("/api/hospitals").param("treatmentIds",
+						lasik.getId().toString(), lasik.getId().toString(), smileLasik.getId().toString()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.content.length()").value(3))
+				.andExpect(jsonPath("$.data.content[1].treatments[*].treatmentId")
+						.value(contains(lasik.getId().intValue(), smileLasik.getId().intValue())));
+		org.assertj.core.api.Assertions.assertThat(statistics.getPrepareStatementCount()).isEqualTo(4);
+		assertSearchAndCount(Map.of("treatmentIds", List.of(lasik.getId().toString(), lasik.getId().toString())),
+				firstHospital, secondHospital);
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = {"/api/hospitals", "/api/hospitals/count"})
+	@DisplayName("존재하지 않는 카테고리·시술·지역·몰과 일부만 유효한 배열을 구분한다")
+	void rejectUnknownFilterIds(String path) throws Exception {
+		for (String field : List.of("medicalCategoryId", "treatmentCategoryId")) {
+			mockMvc.perform(get(path).param(field, "999999"))
+					.andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("CATEGORY_NOT_FOUND"));
+		}
+		mockMvc.perform(get(path).param("treatmentIds", "999999"))
+				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_FILTER"));
+		mockMvc.perform(get(path).param("treatmentIds", lasik.getId().toString(), "999999"))
+				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_FILTER"));
+		mockMvc.perform(get(path).param("regionIds", seoul.getId().toString(), "999999"))
+				.andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("REGION_NOT_FOUND"));
+		mockMvc.perform(get(path).param("mallId", "999999"))
+				.andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("MALL_NOT_FOUND"));
+		assertBadRequest(get(path).param("regionIds", seoul.getId().toString(), seoul.getId().toString(),
+				seoul.getId().toString(), seoul.getId().toString(), seoul.getId().toString(), seoul.getId().toString()));
+		assertBadRequest(get(path).param("minPrice", "200").param("maxPrice", "100"), "INVALID_PRICE_RANGE");
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = {"/api/hospitals", "/api/hospitals/count"})
+	@DisplayName("카테고리와 선택한 모든 시술의 포함 관계를 검증한다")
+	void rejectMismatchedCategories(String path) throws Exception {
+		MedicalCategory otherMedical = persist(MedicalCategory.builder().name("다른 진료").build());
+		TreatmentCategory otherCategory = persist(TreatmentCategory.builder()
+				.medicalCategory(otherMedical).name("다른 시술 카테고리").build());
+		Treatment otherTreatment = persist(Treatment.builder().treatmentCategory(otherCategory).name("다른 시술").build());
+		entityManager.flush();
+		entityManager.clear();
+
+		mockMvc.perform(get(path).param("medicalCategoryId", otherMedical.getId().toString())
+						.param("treatmentCategoryId", visionCorrection.getId().toString()))
+				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("CATEGORY_MISMATCH"));
+		mockMvc.perform(get(path).param("medicalCategoryId", otherMedical.getId().toString())
+						.param("treatmentIds", lasik.getId().toString(), botox.getId().toString()))
+				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("CATEGORY_MISMATCH"));
+		mockMvc.perform(get(path).param("medicalCategoryId", medicalCategory.getId().toString())
+						.param("treatmentIds", lasik.getId().toString(), otherTreatment.getId().toString()))
+				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("CATEGORY_MISMATCH"));
+		mockMvc.perform(get(path).param("treatmentCategoryId", visionCorrection.getId().toString())
+						.param("treatmentIds", lasik.getId().toString(), botox.getId().toString()))
+				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("CATEGORY_MISMATCH"));
+	}
+
+	@ParameterizedTest
+	@CsvSource({
+		"treatmentIds, 0", "treatmentIds, -1", "treatmentIds, abc", "treatmentIds, ''",
+		"treatmentIds, '[1]'", "treatmentIds, 9223372036854775808", "treatmentId, 1",
+		"regionIds, ''", "regionIds, 0", "regionIds, abc", "medicalCategoryId, -1",
+		"treatmentCategoryId, abc", "medicalCategoryId, ''", "mallId, 0", "mallId, ''",
+		"minPrice, -1", "maxPrice, abc", "minPrice, ''", "hasSpecialist, abc",
+		"hasPublicPrice, 1", "hasNightClinic, yes", "hasHolidayClinic, ''"
+	})
+	@DisplayName("목록과 count의 잘못된 숫자·배열·boolean은 INVALID_FILTER로 반환한다")
+	void rejectMalformedFilters(String field, String value) throws Exception {
+		for (String path : List.of("/api/hospitals", "/api/hospitals/count")) {
+			mockMvc.perform(get(path).param(field, value))
+					.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_FILTER"));
+		}
+	}
+
+	@ParameterizedTest
+	@CsvSource({"page, -1", "page, abc", "page, ''", "page, 1000001", "size, 0", "size, 51", "size, abc", "size, ''"})
+	@DisplayName("목록의 페이지 바인딩과 범위 오류는 INVALID_PAGINATION을 반환한다")
+	void rejectInvalidPagination(String field, String value) throws Exception {
+		assertBadRequest(get("/api/hospitals").param(field, value), "INVALID_PAGINATION");
+	}
+
+	@Test
+	@DisplayName("count는 잘못된 페이지와 정렬 입력도 검색 조건으로 사용하지 않는다")
+	void countIgnoresPaginationAndSort() throws Exception {
+		for (String sort : List.of("LOW_PRICE", "invalid", "")) {
+			mockMvc.perform(get("/api/hospitals/count").param("sort", sort).param("page", "abc").param("size", "-1"))
+					.andExpect(status().isOk()).andExpect(jsonPath("$.data").value(4));
+		}
+	}
+
+	@Test
+	@DisplayName("정렬 오류와 LOW_PRICE 시술 미선택을 명세 코드로 구분한다")
+	void rejectInvalidSortAndMissingTreatments() throws Exception {
+		assertBadRequest(get("/api/hospitals").param("sort", ""), "INVALID_SORT");
+		assertBadRequest(get("/api/hospitals").param("sort", "invalid"), "INVALID_SORT");
+		assertBadRequest(get("/api/hospitals").param("sort", "LOW_PRICE").param("treatmentIds", ""), "SORT_REQUIRES_TREATMENT");
+		assertBadRequest(get("/api/hospitals").param("sort", "LOW_PRICE")
+				.param("medicalCategoryId", medicalCategory.getId().toString()), "SORT_REQUIRES_TREATMENT");
+		assertBadRequest(get("/api/hospitals").param("sort", "LOW_PRICE")
+				.param("treatmentCategoryId", visionCorrection.getId().toString()), "SORT_REQUIRES_TREATMENT");
+	}
+
+	@Test
+	@DisplayName("유효한 ID와 빈 값이 섞인 시술 배열도 전체 조회로 바꾸지 않는다")
+	void rejectPartiallyEmptyTreatmentIds() throws Exception {
+		for (String path : List.of("/api/hospitals", "/api/hospitals/count")) {
+			assertBadRequest(get(path).param("treatmentIds", lasik.getId().toString(), ""));
+			assertBadRequest(get(path).param("treatmentIds", lasik.getId() + ",," + smileLasik.getId()));
+		}
+	}
+
+	private void assertSearchAndCount(Map<String, List<String>> filters, Hospital... hospitals) throws Exception {
+		assertHospitalIds(get("/api/hospitals").params(new LinkedMultiValueMap<>(filters)), hospitals);
+		mockMvc.perform(get("/api/hospitals/count").params(new LinkedMultiValueMap<>(filters)))
+				.andExpect(status().isOk()).andExpect(jsonPath("$.data").value(hospitals.length));
+	}
+
+	@Test
+	@DisplayName("복수 시술과 가격 범위는 같은 상품에 적용하며 응답 상품도 가격 범위로 제한한다")
+	void filterMultipleTreatmentsByEffectivePrice() throws Exception {
+		assertSearchAndCount(Map.of(
+				"treatmentIds", List.of(lasik.getId().toString(), smileLasik.getId().toString()),
+				"minPrice", List.of("50000"), "maxPrice", List.of("60000")), secondHospital);
+		mockMvc.perform(get("/api/hospitals").param("treatmentIds", lasik.getId().toString(), smileLasik.getId().toString())
+						.param("minPrice", "50000").param("maxPrice", "60000"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.content[0].treatments[*].treatmentId").value(contains(smileLasik.getId().intValue())));
+		assertSearchAndCount(Map.of("treatmentIds", List.of(lasik.getId().toString()), "maxPrice", List.of("90000")));
+		assertSearchAndCount(Map.of(
+				"treatmentIds", List.of(lasik.getId().toString(), smileLasik.getId().toString()),
+				"minPrice", List.of("0"), "maxPrice", List.of("0")), fourthHospital);
+	}
+
+	@Test
+	@DisplayName("복수 시술에서도 상품별 몰 가격을 우선하고 몰 가격이 없는 상품만 정상가로 대체한다")
+	void filterMultipleTreatmentsWithMallFallback() throws Exception {
+		assertSearchAndCount(Map.of(
+				"treatmentIds", List.of(lasik.getId().toString(), botox.getId().toString()),
+				"mallId", List.of(mall.getId().toString()),
+				"minPrice", List.of("60000"), "maxPrice", List.of("80000")), firstHospital, thirdHospital);
+		assertSearchAndCount(Map.of(
+				"treatmentIds", List.of(lasik.getId().toString(), smileLasik.getId().toString()),
+				"mallId", List.of(mall.getId().toString()),
+				"minPrice", List.of("90000"), "maxPrice", List.of("120000")));
+	}
+
+	@Test
+	@DisplayName("LOW_PRICE는 선택한 복수 시술의 최저 정상가를 사용하고 제공하지 않는 시술은 제외한다")
+	void sortByMinimumSelectedTreatmentPrice() throws Exception {
+		assertHospitalIds(get("/api/hospitals").param("sort", "LOW_PRICE")
+				.param("treatmentIds", lasik.getId().toString(), smileLasik.getId().toString()),
+				fourthHospital, secondHospital, firstHospital);
+		assertHospitalIds(get("/api/hospitals").param("sort", "LOW_PRICE")
+				.param("treatmentIds", lasik.getId().toString(), botox.getId().toString()),
+				thirdHospital, secondHospital, firstHospital);
+	}
+
+	@Test
+	@DisplayName("LOW_PRICE는 각 시술의 몰 가격 fallback 후 최저가를 구한다")
+	void sortAfterApplyingMallFallbackPerTreatment() throws Exception {
+		persist(hospitalTreatment(firstHospital, smileLasik, 30000));
+		entityManager.flush();
+		entityManager.clear();
+		Statistics statistics = statistics();
+		statistics.clear();
+
+		assertHospitalIds(get("/api/hospitals").param("sort", "LOW_PRICE")
+				.param("mallId", mall.getId().toString())
+				.param("treatmentIds", lasik.getId().toString(), smileLasik.getId().toString()),
+				fourthHospital, firstHospital, secondHospital);
+		org.assertj.core.api.Assertions.assertThat(statistics.getPrepareStatementCount()).isEqualTo(6);
+	}
+
+	@Test
+	@DisplayName("복수 시술 LOW_PRICE 정렬에서 동률은 병원 ID 오름차순이다")
+	void breakMinimumPriceTiesByHospitalId() throws Exception {
+		persist(hospitalTreatment(firstHospital, smileLasik, 50001));
+		entityManager.flush();
+		entityManager.clear();
+
+		assertHospitalIds(get("/api/hospitals").param("sort", "LOW_PRICE")
+				.param("treatmentIds", lasik.getId().toString(), smileLasik.getId().toString()),
+				fourthHospital, firstHospital, secondHospital);
+	}
+
+	@Test
+	@DisplayName("Swagger는 복수 시술과 count 전용 필터 및 병원 API 오류 명세를 생성한다")
+	void documentHospitalApiContract() throws Exception {
+		mockMvc.perform(get("/v3/api-docs"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.paths['/api/hospitals'].get.parameters[?(@.name=='medicalCategoryId')]").isNotEmpty())
+				.andExpect(jsonPath("$.paths['/api/hospitals'].get.parameters[?(@.name=='treatmentIds')].schema.type")
+						.value(contains("array")))
+				.andExpect(jsonPath("$.paths['/api/hospitals'].get.parameters[?(@.name=='treatmentIds')].schema.items.type")
+						.value(contains("integer")))
+				.andExpect(jsonPath("$.paths['/api/hospitals'].get.parameters[?(@.name=='treatmentId')]").isEmpty())
+				.andExpect(jsonPath("$.paths['/api/hospitals/count'].get.parameters[?(@.name=='page'||@.name=='size'||@.name=='sort')]").isEmpty())
+				.andExpect(jsonPath("$.paths['/api/hospitals/count'].get.parameters[?(@.name=='treatmentIds')].schema.type")
+						.value(contains("array")))
+				.andExpect(jsonPath("$.paths['/api/hospitals'].get.responses['200']").exists())
+				.andExpect(jsonPath("$.paths['/api/hospitals'].get.responses['400'].description")
+						.value(org.hamcrest.Matchers.containsString("SORT_REQUIRES_TREATMENT")))
+				.andExpect(jsonPath("$.paths['/api/hospitals/count'].get.responses['404'].description")
+						.value(org.hamcrest.Matchers.containsString("CATEGORY_NOT_FOUND")))
+				.andExpect(jsonPath("$.paths['/api/hospitals/{hospitalId}/treatments/{treatmentId}'].get.parameters[*].name")
+						.value(org.hamcrest.Matchers.containsInAnyOrder("hospitalId", "treatmentId", "mallId")))
+				.andExpect(jsonPath("$.paths['/api/hospitals/{hospitalId}/treatments/{treatmentId}'].get.parameters[*].schema.type")
+						.value(contains("integer", "integer", "integer")))
+				.andExpect(jsonPath("$.paths['/api/hospitals/{hospitalId}/treatments/{treatmentId}'].get.responses['404'].description")
+						.value(org.hamcrest.Matchers.allOf(
+								org.hamcrest.Matchers.containsString("MALL_NOT_FOUND"),
+								org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("MALL_OFFER_NOT_FOUND")))))
+				.andExpect(jsonPath("$.paths['/api/hospitals/{hospitalId}/treatments/{treatmentId}'].get.description")
+						.value(org.hamcrest.Matchers.containsString("discountPrice=null")));
 	}
 
 	@Test
@@ -413,7 +682,7 @@ class HospitalControllerTest {
 				.andExpect(jsonPath("$.data").value(4));
 		mockMvc.perform(get("/api/hospitals/count")
 						.param("treatmentCategoryId", visionCorrection.getId().toString())
-						.param("treatmentId", lasik.getId().toString()))
+						.param("treatmentIds", lasik.getId().toString()))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.data").value(2));
 	}
@@ -451,7 +720,7 @@ class HospitalControllerTest {
 				.andExpect(jsonPath("$.data.content[*].treatments[*].isSpecialOffer").doesNotExist());
 
 		org.assertj.core.api.Assertions.assertThat(statistics.getPrepareStatementCount()).isEqualTo(3);
-		mockMvc.perform(get("/api/hospitals").param("treatmentId", botox.getId().toString()))
+		mockMvc.perform(get("/api/hospitals").param("treatmentIds", botox.getId().toString()))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.data.content[0].badgeTypes")
 						.value(contains("POPULAR", "NIGHT_CLINIC", "SAME_DAY_BOOKING", "OPEN_TODAY", "SPECIAL_OFFER")));
@@ -471,7 +740,7 @@ class HospitalControllerTest {
 		entityManager.clear();
 
 		mockMvc.perform(get("/api/hospitals").param("regionIds", seocho.getId().toString())
-						.param("treatmentId", lasik.getId().toString()).param("mallId", mall.getId().toString()))
+						.param("treatmentIds", lasik.getId().toString()).param("mallId", mall.getId().toString()))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.data.content[0].hospitalId").value(secondHospital.getId()))
 				.andExpect(jsonPath("$.data.content[0].treatments[0].discountPrice").value(60000))
@@ -483,7 +752,7 @@ class HospitalControllerTest {
 	@Test
 	@DisplayName("할인 가격이 없어도 병원 특가 배지가 true이면 특가 배지를 반환한다")
 	void includeSpecialOfferBadgeWithoutDiscountPrice() throws Exception {
-		mockMvc.perform(get("/api/hospitals").param("treatmentId", botox.getId().toString())
+		mockMvc.perform(get("/api/hospitals").param("treatmentIds", botox.getId().toString())
 						.param("mallId", mall.getId().toString()))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.data.content[0].hospitalId").value(firstHospital.getId()))
@@ -614,11 +883,12 @@ class HospitalControllerTest {
 				.toArray(Integer[]::new);
 		mockMvc.perform(request)
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.data.content[*].hospitalId").value(contains(ids)));
+				.andExpect(ids.length == 0 ? jsonPath("$.data.content").isEmpty()
+						: jsonPath("$.data.content[*].hospitalId").value(contains(ids)));
 	}
 
 	private void assertBadRequest(MockHttpServletRequestBuilder request) throws Exception {
-		assertBadRequest(request, "COMMON400");
+		assertBadRequest(request, "INVALID_FILTER");
 	}
 
 	private void assertBadRequest(MockHttpServletRequestBuilder request, String code) throws Exception {

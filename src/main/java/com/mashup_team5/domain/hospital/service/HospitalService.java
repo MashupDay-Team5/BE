@@ -13,8 +13,15 @@ import com.mashup_team5.domain.hospital.repository.HospitalTreatmentRepository;
 import com.mashup_team5.domain.hospital.repository.projection.HospitalTreatmentPriceRow;
 import com.mashup_team5.domain.hospital.repository.projection.MallPriceRow;
 import com.mashup_team5.domain.mall.repository.MallPriceRepository;
+import com.mashup_team5.domain.mall.repository.MallRepository;
 import com.mashup_team5.domain.region.entity.Region;
+import com.mashup_team5.domain.region.repository.RegionRepository;
 import com.mashup_team5.domain.review.repository.ReviewRepository;
+import com.mashup_team5.domain.treatment.entity.Treatment;
+import com.mashup_team5.domain.treatment.entity.TreatmentCategory;
+import com.mashup_team5.domain.treatment.repository.MedicalCategoryRepository;
+import com.mashup_team5.domain.treatment.repository.TreatmentCategoryRepository;
+import com.mashup_team5.domain.treatment.repository.TreatmentRepository;
 import com.mashup_team5.global.exception.CustomException;
 import com.mashup_team5.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -36,9 +44,14 @@ public class HospitalService {
 	private final HospitalTreatmentRepository hospitalTreatmentRepository;
 	private final MallPriceRepository mallPriceRepository;
 	private final ReviewRepository reviewRepository;
+	private final MedicalCategoryRepository medicalCategoryRepository;
+	private final TreatmentCategoryRepository treatmentCategoryRepository;
+	private final TreatmentRepository treatmentRepository;
+	private final RegionRepository regionRepository;
+	private final MallRepository mallRepository;
 
 	public HospitalListResponse getHospitals(HospitalSearchRequest request) {
-		HospitalSearchCondition condition = validatedCondition(request);
+		HospitalSearchCondition condition = validatedCondition(request.toCondition());
 		HospitalIdSlice slice = hospitalRepository.findHospitalIds(condition);
 		if (slice.hospitalIds().isEmpty()) {
 			return new HospitalListResponse(List.of(), condition.page(), condition.size(), false);
@@ -48,7 +61,8 @@ public class HospitalService {
 				.stream()
 				.collect(Collectors.toMap(Hospital::getId, Function.identity()));
 		List<HospitalTreatmentPriceRow> priceRows = hospitalTreatmentRepository.findPriceRows(
-				slice.hospitalIds(), condition.treatmentCategoryId(), condition.treatmentId());
+				slice.hospitalIds(), condition.medicalCategoryId(), condition.treatmentCategoryId(),
+				condition.treatmentIds(), !condition.treatmentIds().isEmpty());
 		Map<Long, List<HospitalTreatmentPriceRow>> priceRowsByHospital = priceRows.stream()
 				.collect(Collectors.groupingBy(HospitalTreatmentPriceRow::hospitalId));
 		Map<Long, Integer> mallPrices = findMallPrices(condition.mallId(), priceRows);
@@ -63,17 +77,18 @@ public class HospitalService {
 		return new HospitalListResponse(content, condition.page(), condition.size(), slice.hasNext());
 	}
 
-	public long countHospitals(HospitalSearchRequest request) {
-		return hospitalRepository.countHospitals(validatedCondition(request));
+	public long countHospitals(HospitalCountRequest request) {
+		return hospitalRepository.countHospitals(validatedCondition(request.toCondition()));
 	}
 
 	public HospitalDetailResponse getHospitalDetail(Long hospitalId, Long treatmentId, Long mallId) {
 		validateIds(hospitalId, treatmentId);
+		validateMall(mallId);
 		Hospital hospital = hospitalRepository.findAllWithRegionByIdIn(List.of(hospitalId)).stream()
 				.findFirst()
-				.orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND));
+				.orElseThrow(() -> new CustomException(ErrorCode.HOSPITAL_TREATMENT_NOT_FOUND));
 		HospitalTreatmentPriceRow priceRow = hospitalTreatmentRepository
-				.findPriceRows(List.of(hospitalId), null, treatmentId).stream()
+				.findPriceRows(List.of(hospitalId), null, null, List.of(treatmentId), true).stream()
 				.findFirst()
 				.orElseThrow(() -> new CustomException(ErrorCode.HOSPITAL_TREATMENT_NOT_FOUND));
 		long totalReviewCount = reviewCount(hospital);
@@ -97,16 +112,60 @@ public class HospitalService {
 		);
 	}
 
-	private HospitalSearchCondition validatedCondition(HospitalSearchRequest request) {
-		HospitalSearchCondition condition = request.toCondition();
+	private HospitalSearchCondition validatedCondition(HospitalSearchCondition condition) {
 		if (condition.minPrice() != null && condition.maxPrice() != null
 				&& condition.minPrice() > condition.maxPrice()) {
 			throw new CustomException(ErrorCode.INVALID_PRICE_RANGE);
 		}
-		if (condition.sort() == HospitalSort.LOW_PRICE && condition.treatmentId() == null) {
-			throw new CustomException(ErrorCode.TREATMENT_REQUIRED_FOR_PRICE_SORT);
+		if (condition.sort() == HospitalSort.LOW_PRICE && condition.treatmentIds().isEmpty()) {
+			throw new CustomException(ErrorCode.SORT_REQUIRES_TREATMENT);
 		}
+		validateCategories(condition);
+		if (!condition.regionIds().isEmpty()
+				&& regionRepository.countByIdIn(condition.regionIds()) != condition.regionIds().size()) {
+			throw new CustomException(ErrorCode.REGION_NOT_FOUND);
+		}
+		validateMall(condition.mallId());
 		return condition;
+	}
+
+	private void validateCategories(HospitalSearchCondition condition) {
+		if (condition.medicalCategoryId() != null
+				&& !medicalCategoryRepository.existsById(condition.medicalCategoryId())) {
+			throw new CustomException(ErrorCode.CATEGORY_NOT_FOUND);
+		}
+		if (condition.treatmentCategoryId() != null) {
+			TreatmentCategory category = treatmentCategoryRepository.findById(condition.treatmentCategoryId())
+					.orElseThrow(() -> new CustomException(ErrorCode.CATEGORY_NOT_FOUND));
+			if (condition.medicalCategoryId() != null && (category.getMedicalCategory() == null
+					|| !Objects.equals(category.getMedicalCategory().getId(), condition.medicalCategoryId()))) {
+				throw new CustomException(ErrorCode.CATEGORY_MISMATCH);
+			}
+		}
+		if (condition.treatmentIds().isEmpty()) {
+			return;
+		}
+		List<Treatment> treatments = treatmentRepository.findAllWithCategoriesByIdIn(condition.treatmentIds());
+		if (treatments.size() != condition.treatmentIds().size()) {
+			throw new CustomException(ErrorCode.INVALID_FILTER);
+		}
+		for (Treatment treatment : treatments) {
+			TreatmentCategory category = treatment.getTreatmentCategory();
+			if (condition.treatmentCategoryId() != null && (category == null
+					|| !Objects.equals(category.getId(), condition.treatmentCategoryId()))) {
+				throw new CustomException(ErrorCode.CATEGORY_MISMATCH);
+			}
+			if (condition.medicalCategoryId() != null && (category == null || category.getMedicalCategory() == null
+					|| !Objects.equals(category.getMedicalCategory().getId(), condition.medicalCategoryId()))) {
+				throw new CustomException(ErrorCode.CATEGORY_MISMATCH);
+			}
+		}
+	}
+
+	private void validateMall(Long mallId) {
+		if (mallId != null && !mallRepository.existsById(mallId)) {
+			throw new CustomException(ErrorCode.MALL_NOT_FOUND);
+		}
 	}
 
 	private Map<Long, Integer> findMallPrices(

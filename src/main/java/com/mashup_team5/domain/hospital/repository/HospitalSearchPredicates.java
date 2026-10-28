@@ -18,7 +18,8 @@ final class HospitalSearchPredicates {
 		QHospital hospital,
 		HospitalSearchCondition condition) {
 		if (hasPriceRange(condition)
-			|| condition.treatmentId() == null && condition.treatmentCategoryId() == null) {
+			|| condition.treatmentIds().isEmpty() && condition.treatmentCategoryId() == null
+				&& condition.medicalCategoryId() == null) {
 			return null;
 		}
 		QHospitalTreatment hospitalTreatment = new QHospitalTreatment("treatmentFilter");
@@ -128,16 +129,14 @@ final class HospitalSearchPredicates {
 	private static BooleanExpression treatmentTarget(
 		QTreatment treatment,
 		HospitalSearchCondition condition) {
-		if (condition.treatmentId() == null && condition.treatmentCategoryId() == null) {
-			return null;
+		if (!condition.treatmentIds().isEmpty()) {
+			return treatment.id.in(condition.treatmentIds());
 		}
-		if (condition.treatmentId() != null && condition.treatmentCategoryId() != null) {
-			return treatment.id.eq(condition.treatmentId())
-				.and(treatment.treatmentCategory.id.eq(condition.treatmentCategoryId()));
+		if (condition.treatmentCategoryId() != null) {
+			return treatment.treatmentCategory.id.eq(condition.treatmentCategoryId());
 		}
-		return condition.treatmentId() != null
-			? treatment.id.eq(condition.treatmentId())
-			: treatment.treatmentCategory.id.eq(condition.treatmentCategoryId());
+		return condition.medicalCategoryId() == null ? null
+			: treatment.treatmentCategory.medicalCategory.id.eq(condition.medicalCategoryId());
 	}
 
 	private static BooleanExpression priceRange(

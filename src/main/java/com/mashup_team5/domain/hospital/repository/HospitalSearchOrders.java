@@ -33,31 +33,29 @@ final class HospitalSearchOrders {
 		HospitalSearchCondition condition) {
 		QHospitalTreatment hospitalTreatment = new QHospitalTreatment("sortHospitalTreatment");
 		QTreatment treatment = new QTreatment("sortTreatment");
-		JPQLSubQuery<Integer> regularPrice = JPAExpressions.select(hospitalTreatment.regularPrice)
-			.from(hospitalTreatment)
-			.join(hospitalTreatment.treatment, treatment)
-			.where(
-				hospitalTreatment.hospital.eq(hospital),
-				treatment.id.eq(condition.treatmentId())
-			);
 		if (condition.mallId() == null) {
+			JPQLSubQuery<Integer> regularPrice = JPAExpressions.select(hospitalTreatment.regularPrice.min())
+				.from(hospitalTreatment)
+				.join(hospitalTreatment.treatment, treatment)
+				.where(
+					hospitalTreatment.hospital.eq(hospital),
+					treatment.id.in(condition.treatmentIds())
+				);
 			return Expressions.numberTemplate(
 				Integer.class, "coalesce({0}, {1})", regularPrice, Integer.MAX_VALUE);
 		}
-
 		QMallPrice mallPrice = new QMallPrice("sortMallPrice");
-		QHospitalTreatment mallHospitalTreatment = new QHospitalTreatment("sortMallHospitalTreatment");
-		QTreatment mallTreatment = new QTreatment("sortMallTreatment");
-		JPQLSubQuery<Integer> discountPrice = JPAExpressions.select(mallPrice.price)
-			.from(mallPrice)
-			.join(mallPrice.hospitalTreatment, mallHospitalTreatment)
-			.join(mallHospitalTreatment.treatment, mallTreatment)
+		JPQLSubQuery<Integer> effectivePrice = JPAExpressions.select(mallPrice.price.coalesce(hospitalTreatment.regularPrice).min())
+			.from(hospitalTreatment)
+			.join(hospitalTreatment.treatment, treatment)
+			.leftJoin(mallPrice).on(
+				mallPrice.hospitalTreatment.eq(hospitalTreatment),
+				mallPrice.mall.id.eq(condition.mallId()))
 			.where(
-				mallHospitalTreatment.hospital.eq(hospital),
-				mallTreatment.id.eq(condition.treatmentId()),
-				mallPrice.mall.id.eq(condition.mallId())
+				hospitalTreatment.hospital.eq(hospital),
+				treatment.id.in(condition.treatmentIds())
 			);
 		return Expressions.numberTemplate(
-			Integer.class, "coalesce({0}, {1}, {2})", discountPrice, regularPrice, Integer.MAX_VALUE);
+			Integer.class, "coalesce({0}, {1})", effectivePrice, Integer.MAX_VALUE);
 	}
 }
