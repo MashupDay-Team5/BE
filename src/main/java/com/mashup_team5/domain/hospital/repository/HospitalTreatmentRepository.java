@@ -18,13 +18,17 @@ public interface HospitalTreatmentRepository extends JpaRepository<HospitalTreat
 		)
 		from HospitalTreatment ht
 		join ht.treatment t
+		left join t.treatmentCategory tc
 		where ht.hospital.id in :hospitalIds
-		  and (:treatmentCategoryId is null or t.treatmentCategory.id = :treatmentCategoryId)
-		  and (:treatmentId is null or t.id = :treatmentId)
+		  and (:medicalCategoryId is null or tc.medicalCategory.id = :medicalCategoryId)
+		  and (:treatmentCategoryId is null or tc.id = :treatmentCategoryId)
+		  and (:filterTreatments = false or t.id in :treatmentIds)
 		order by ht.hospital.id asc, ht.id asc
 		""")
 	List<HospitalTreatmentPriceRow> findPriceRows(
 		@Param("hospitalIds") Collection<Long> hospitalIds,
+		@Param("medicalCategoryId") Long medicalCategoryId,
 		@Param("treatmentCategoryId") Long treatmentCategoryId,
-		@Param("treatmentId") Long treatmentId);
+		@Param("treatmentIds") Collection<Long> treatmentIds,
+		@Param("filterTreatments") boolean filterTreatments);
 }
