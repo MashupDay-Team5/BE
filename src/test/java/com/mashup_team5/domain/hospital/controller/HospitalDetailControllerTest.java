@@ -18,6 +18,8 @@ import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -126,7 +128,8 @@ class HospitalDetailControllerTest {
 				.andExpect(jsonPath("$.data.treatment.treatmentId").value(selectedTreatment.getId()))
 				.andExpect(jsonPath("$.data.treatment.treatmentName").value("스마일라식"))
 				.andExpect(jsonPath("$.data.treatment.regularPrice").value(1900000))
-				.andExpect(jsonPath("$.data.treatment.discountPrice").doesNotExist())
+				.andExpect(jsonPath("$.data.treatment.discountPrice").hasJsonPath())
+				.andExpect(jsonPath("$.data.treatment.discountPrice").value(org.hamcrest.Matchers.nullValue()))
 				.andExpect(jsonPath("$.data.treatment.displayPrice").doesNotExist())
 				.andExpect(jsonPath("$.data.treatment.priceType").doesNotExist())
 				.andExpect(jsonPath("$.data.treatment.isSpecialOffer").doesNotExist());
@@ -148,7 +151,7 @@ class HospitalDetailControllerTest {
 	}
 
 	@Test
-	@DisplayName("몰 가격이 있으면 할인 가격을 반환하고 없으면 null을 반환한다")
+	@DisplayName("몰 가격이 있으면 할인 가격을 반환하고 없으면 상세 정보와 null 할인 가격을 반환한다")
 	void getHospitalDetailWithMallPrice() throws Exception {
 		Statistics statistics = statistics();
 		statistics.clear();
@@ -160,14 +163,25 @@ class HospitalDetailControllerTest {
 				.andExpect(jsonPath("$.data.treatment.regularPrice").value(1900000))
 				.andExpect(jsonPath("$.data.treatment.discountPrice").value(1500000));
 
-		assertThat(statistics.getPrepareStatementCount()).isEqualTo(4);
+		assertThat(statistics.getPrepareStatementCount()).isEqualTo(5);
 
 		mockMvc.perform(get("/api/hospitals/{hospitalId}/treatments/{treatmentId}",
 					hospital.getId(), selectedTreatment.getId())
 					.param("mallId", noPriceMall.getId().toString()))
 				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.success").value(true))
+				.andExpect(jsonPath("$.code").value("COMMON200"))
+				.andExpect(jsonPath("$.data.hospitalId").value(hospital.getId()))
+				.andExpect(jsonPath("$.data.hospitalName").value("OO안과"))
+				.andExpect(jsonPath("$.data.address").value("서울특별시 서초구 서초대로 123"))
+				.andExpect(jsonPath("$.data.rating").value(4.2))
+				.andExpect(jsonPath("$.data.totalReviewCount").value(120))
+				.andExpect(jsonPath("$.data.relatedReviewCount").value(4))
+				.andExpect(jsonPath("$.data.otherReviewCount").value(116))
+				.andExpect(jsonPath("$.data.treatment.treatmentId").value(selectedTreatment.getId()))
 				.andExpect(jsonPath("$.data.treatment.regularPrice").value(1900000))
-				.andExpect(jsonPath("$.data.treatment.discountPrice").doesNotExist());
+				.andExpect(jsonPath("$.data.treatment.discountPrice").hasJsonPath())
+				.andExpect(jsonPath("$.data.treatment.discountPrice").value(org.hamcrest.Matchers.nullValue()));
 	}
 
 	@Test
@@ -177,7 +191,7 @@ class HospitalDetailControllerTest {
 					999999L, selectedTreatment.getId()))
 				.andExpect(status().isNotFound())
 				.andExpect(jsonPath("$.success").value(false))
-				.andExpect(jsonPath("$.code").value("COMMON404"));
+				.andExpect(jsonPath("$.code").value("HOSPITAL_TREATMENT_NOT_FOUND"));
 	}
 
 	@Test
@@ -187,7 +201,7 @@ class HospitalDetailControllerTest {
 					hospital.getId(), unsupportedTreatment.getId()))
 				.andExpect(status().isNotFound())
 				.andExpect(jsonPath("$.success").value(false))
-				.andExpect(jsonPath("$.code").value("HOSPITAL_TREATMENT_NOT_FOUND404"));
+				.andExpect(jsonPath("$.code").value("HOSPITAL_TREATMENT_NOT_FOUND"));
 	}
 
 	@Test
@@ -196,12 +210,12 @@ class HospitalDetailControllerTest {
 		mockMvc.perform(get("/api/hospitals/{hospitalId}/treatments/{treatmentId}",
 					0L, selectedTreatment.getId()))
 				.andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.code").value("INVALID_ID400"));
+				.andExpect(jsonPath("$.code").value("INVALID_ID"));
 
 		mockMvc.perform(get("/api/hospitals/{hospitalId}/treatments/{treatmentId}",
 					hospital.getId(), 0L))
 				.andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.code").value("INVALID_ID400"));
+				.andExpect(jsonPath("$.code").value("INVALID_ID"));
 	}
 
 	@Test
@@ -280,6 +294,33 @@ class HospitalDetailControllerTest {
 				.hasHolidayClinic(false)
 				.isReservable(true)
 				.monthlyVisitCount(100);
+	}
+
+	@Test
+	@DisplayName("상세에서 존재하지 않는 몰은 MALL_NOT_FOUND를 반환한다")
+	void rejectUnknownMall() throws Exception {
+		mockMvc.perform(get("/api/hospitals/{hospitalId}/treatments/{treatmentId}", hospital.getId(), selectedTreatment.getId())
+						.param("mallId", "999999"))
+				.andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("MALL_NOT_FOUND"));
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = {"abc", "-1", "0", "9223372036854775808"})
+	@DisplayName("상세 경로 ID의 바인딩 및 범위 오류는 INVALID_ID를 반환한다")
+	void rejectMalformedPathIds(String value) throws Exception {
+		mockMvc.perform(get("/api/hospitals/{hospitalId}/treatments/{treatmentId}", value, selectedTreatment.getId()))
+				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_ID"));
+		mockMvc.perform(get("/api/hospitals/{hospitalId}/treatments/{treatmentId}", hospital.getId(), value))
+				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_ID"));
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = {"abc", "-1", "0", ""})
+	@DisplayName("상세의 잘못된 몰 ID는 INVALID_ID를 반환한다")
+	void rejectMalformedMallIds(String value) throws Exception {
+		mockMvc.perform(get("/api/hospitals/{hospitalId}/treatments/{treatmentId}", hospital.getId(), selectedTreatment.getId())
+						.param("mallId", value))
+				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_ID"));
 	}
 
 	private HospitalTreatment hospitalTreatment(Hospital targetHospital, Treatment treatment, int regularPrice) {
