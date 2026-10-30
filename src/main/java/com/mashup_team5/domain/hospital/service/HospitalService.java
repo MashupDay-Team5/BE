@@ -16,6 +16,7 @@ import com.mashup_team5.domain.mall.repository.MallPriceRepository;
 import com.mashup_team5.domain.mall.repository.MallRepository;
 import com.mashup_team5.domain.region.entity.Region;
 import com.mashup_team5.domain.region.repository.RegionRepository;
+import com.mashup_team5.domain.review.policy.ReviewTreatmentMapping;
 import com.mashup_team5.domain.review.repository.ReviewRepository;
 import com.mashup_team5.domain.treatment.entity.Treatment;
 import com.mashup_team5.domain.treatment.entity.TreatmentCategory;
@@ -92,7 +93,8 @@ public class HospitalService {
 				.findFirst()
 				.orElseThrow(() -> new CustomException(ErrorCode.HOSPITAL_TREATMENT_NOT_FOUND));
 		long totalReviewCount = reviewCount(hospital);
-		long relatedReviewCount = reviewRepository.countMatchingReviews(hospitalId, treatmentId, true);
+		long relatedReviewCount = reviewRepository.countMatchingReviews(
+				hospitalId, ReviewTreatmentMapping.treatmentIdsFor(treatmentId), true);
 		long otherReviewCount = Math.max(totalReviewCount - relatedReviewCount, 0L);
 		Integer discountPrice = findMallPrices(mallId, List.of(priceRow)).get(priceRow.hospitalTreatmentId());
 		return new HospitalDetailResponse(

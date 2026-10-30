@@ -1,6 +1,7 @@
 package com.mashup_team5.domain.review.repository;
 
 import com.mashup_team5.domain.review.entity.Review;
+import java.util.Collection;
 import java.util.List;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -14,11 +15,11 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
 		  and (
 		    (:related = true and exists (
 		      select rt.id from ReviewTreatment rt
-		      where rt.review = r and rt.treatment.id = :treatmentId
+		      where rt.review = r and rt.treatment.id in :treatmentIds
 		    ))
 		    or (:related = false and not exists (
 		      select rt.id from ReviewTreatment rt
-		      where rt.review = r and rt.treatment.id = :treatmentId
+		      where rt.review = r and rt.treatment.id in :treatmentIds
 		    ))
 		  )
 		""";
@@ -26,7 +27,7 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
 	@Query("select count(r) from Review r " + MATCHING_REVIEWS)
 	long countMatchingReviews(
 		@Param("hospitalId") Long hospitalId,
-		@Param("treatmentId") Long treatmentId,
+		@Param("treatmentIds") Collection<Long> treatmentIds,
 		@Param("related") boolean related
 	);
 
@@ -42,7 +43,7 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
 		""")
 	List<Review> findMatchingReviews(
 		@Param("hospitalId") Long hospitalId,
-		@Param("treatmentId") Long treatmentId,
+		@Param("treatmentIds") Collection<Long> treatmentIds,
 		@Param("related") boolean related,
 		@Param("sort") String sort,
 		Pageable pageable
