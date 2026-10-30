@@ -76,6 +76,18 @@ class CategoryControllerTest {
 	}
 
 	@Test
+	@DisplayName("원래 시술이 없는 카테고리는 유지한다")
+	void retainOriginallyEmptyCategory() throws Exception {
+		MedicalCategory medicalCategory = medicalCategoryRepository.save(MedicalCategory.builder().name("안과").build());
+		TreatmentCategory category = treatmentCategoryRepository.save(TreatmentCategory.builder()
+			.medicalCategory(medicalCategory).name("기타").build());
+		mockMvc.perform(get("/api/categories"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data[0].treatmentCategories[0].treatmentCategoryId").value(category.getId()))
+			.andExpect(jsonPath("$.data[0].treatmentCategories[0].treatments").isEmpty());
+	}
+
+	@Test
 	@DisplayName("진료 분류 데이터가 없으면 빈 배열을 반환한다")
 	void getEmptyCategories() throws Exception {
 		mockMvc.perform(get("/api/categories"))
