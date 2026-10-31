@@ -13,7 +13,8 @@ public class CorsConfig implements WebMvcConfigurer {
 			.allowedOrigins(
 					"http://localhost:5173",
 					"https://mashup-modoodoc.vercel.app",
-					"https://mashup-modoodoc-preview.vercel.app"
+					"https://mashup-modoodoc-preview.vercel.app",
+					"https://modoodock.shop"
 			)
 			.allowedMethods("GET", "HEAD", "POST")
 			.allowedHeaders("Content-Type")
