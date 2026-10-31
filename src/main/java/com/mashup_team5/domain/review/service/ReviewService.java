@@ -9,6 +9,7 @@ import com.mashup_team5.domain.review.entity.Review;
 import com.mashup_team5.domain.review.entity.ReviewTreatment;
 import com.mashup_team5.domain.review.enums.ReviewScope;
 import com.mashup_team5.domain.review.enums.ReviewSort;
+import com.mashup_team5.domain.review.policy.ReviewTreatmentMapping;
 import com.mashup_team5.domain.review.repository.ReviewRepository;
 import com.mashup_team5.domain.review.repository.ReviewTreatmentRepository;
 import com.mashup_team5.global.exception.CustomException;
@@ -43,14 +44,15 @@ public class ReviewService {
 
 		PageRequest pageable = PageRequest.of(request.getPage(), request.getSize());
 		boolean related = scope == ReviewScope.RELATED;
-		long totalCount = reviewRepository.countMatchingReviews(hospitalId, treatmentId, related);
+		List<Long> treatmentIds = ReviewTreatmentMapping.treatmentIdsFor(treatmentId);
+		long totalCount = reviewRepository.countMatchingReviews(hospitalId, treatmentIds, related);
 		if (pageable.getOffset() >= totalCount) {
 			return new ReviewListRes(
 				hospitalId, treatmentId, scope, List.of(), totalCount, request.getPage(), request.getSize(), false);
 		}
 
 		List<Review> reviews = reviewRepository.findMatchingReviews(
-			hospitalId, treatmentId, related, sort.name(), pageable);
+			hospitalId, treatmentIds, related, sort.name(), pageable);
 		Map<Long, List<ReceivedTreatmentRes>> treatments = getReceivedTreatments(reviews);
 		List<ReviewItemRes> items = reviews.stream()
 			.map(review -> ReviewItemRes.from(review, treatments.getOrDefault(review.getId(), List.of())))
