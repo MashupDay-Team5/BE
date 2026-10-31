@@ -1,9 +1,12 @@
 package com.mashup_team5.domain.review.entity;
 
 import com.mashup_team5.domain.hospital.entity.Hospital;
+import com.mashup_team5.domain.review.enums.ReservationType;
 import com.mashup_team5.domain.user.entity.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -58,8 +61,9 @@ public class Review {
 	@Column(name = "is_modoodoc_visit")
 	private Boolean isModoodocVisit;
 
-	@Column(name = "is_reservation_visit")
-	private Boolean isReservationVisit;
+	@Enumerated(EnumType.STRING)
+	@Column(name = "reservation_type")
+	private ReservationType reservationType;
 
 	@Column(name = "helpful_count")
 	private Integer helpfulCount;
@@ -71,7 +75,7 @@ public class Review {
 	public Review(
 		Hospital hospital, User user, Integer paidPrice, BigDecimal rating, String content,
 		String doctorName, Boolean willRevisit, Boolean isReceiptVerified, Boolean isModoodocVisit,
-		Boolean isReservationVisit, Integer helpfulCount, LocalDateTime createdAt) {
+		ReservationType reservationType, Integer helpfulCount, LocalDateTime createdAt) {
 		this.hospital = hospital;
 		this.user = user;
 		this.paidPrice = paidPrice;
@@ -81,7 +85,7 @@ public class Review {
 		this.willRevisit = willRevisit;
 		this.isReceiptVerified = isReceiptVerified;
 		this.isModoodocVisit = isModoodocVisit;
-		this.isReservationVisit = isReservationVisit;
+		this.reservationType = reservationType;
 		this.helpfulCount = helpfulCount;
 		this.createdAt = createdAt;
 	}

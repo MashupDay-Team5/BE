@@ -1,6 +1,7 @@
 package com.mashup_team5.domain.review.dto.response;
 
 import com.mashup_team5.domain.review.entity.Review;
+import com.mashup_team5.domain.review.enums.ReservationType;
 import com.mashup_team5.domain.review.enums.ReviewScope;
 import com.mashup_team5.domain.treatment.entity.Treatment;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -31,7 +32,8 @@ public record ReviewListRes(
 		boolean willRevisit,
 		boolean receiptVerified,
 		boolean modoodocVisit,
-		boolean reservationVisit,
+		@Schema(description = "예약 유형. 예약은 RESERVATION, 상담신청은 CONSULTATION, 없음은 null", nullable = true)
+		ReservationType reservationType,
 		int helpfulCount,
 		@Schema(description = "DB에 UTC 기준으로 저장된 작성 시각") OffsetDateTime createdAt
 	) {
@@ -43,7 +45,7 @@ public record ReviewListRes(
 				review.getId(), authorDisplayName, review.getRating(), review.getContent(), treatments,
 				review.getPaidPrice(), review.getDoctorName(), Boolean.TRUE.equals(review.getWillRevisit()),
 				Boolean.TRUE.equals(review.getIsReceiptVerified()), Boolean.TRUE.equals(review.getIsModoodocVisit()),
-				Boolean.TRUE.equals(review.getIsReservationVisit()),
+				review.getReservationType(),
 				review.getHelpfulCount() == null ? 0 : review.getHelpfulCount(),
 				review.getCreatedAt() == null ? null : review.getCreatedAt().atOffset(ZoneOffset.UTC)
 			);
