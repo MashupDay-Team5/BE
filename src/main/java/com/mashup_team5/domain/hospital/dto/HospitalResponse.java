@@ -12,7 +12,6 @@ public record HospitalResponse(
 	long reviewCount,
 	Boolean hasSpecialist,
 	Boolean hasPublicPrice,
-	Boolean hasNightClinic,
 	Boolean hasHolidayClinic,
 	List<HospitalBadgeType> badgeTypes,
 	List<TreatmentPriceResponse> treatments
