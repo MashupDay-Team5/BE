@@ -124,7 +124,7 @@ class HospitalDetailControllerTest {
 				.andExpect(jsonPath("$.data.rating").value(4.2))
 				.andExpect(jsonPath("$.data.totalReviewCount").value(120))
 				.andExpect(jsonPath("$.data.relatedReviewCount").value(4))
-				.andExpect(jsonPath("$.data.otherReviewCount").value(116))
+				.andExpect(jsonPath("$.data.otherReviewCount").value(6))
 				.andExpect(jsonPath("$.data.treatment.treatmentId").value(selectedTreatment.getId()))
 				.andExpect(jsonPath("$.data.treatment.treatmentName").value("스마일라식"))
 				.andExpect(jsonPath("$.data.treatment.regularPrice").value(1900000))
@@ -134,7 +134,7 @@ class HospitalDetailControllerTest {
 				.andExpect(jsonPath("$.data.treatment.priceType").doesNotExist())
 				.andExpect(jsonPath("$.data.treatment.isSpecialOffer").doesNotExist());
 
-		assertThat(statistics.getPrepareStatementCount()).isEqualTo(3);
+		assertThat(statistics.getPrepareStatementCount()).isEqualTo(4);
 	}
 
 	@Test
@@ -163,7 +163,7 @@ class HospitalDetailControllerTest {
 				.andExpect(jsonPath("$.data.treatment.regularPrice").value(1900000))
 				.andExpect(jsonPath("$.data.treatment.discountPrice").value(1500000));
 
-		assertThat(statistics.getPrepareStatementCount()).isEqualTo(5);
+		assertThat(statistics.getPrepareStatementCount()).isEqualTo(6);
 
 		mockMvc.perform(get("/api/hospitals/{hospitalId}/treatments/{treatmentId}",
 					hospital.getId(), selectedTreatment.getId())
@@ -177,7 +177,7 @@ class HospitalDetailControllerTest {
 				.andExpect(jsonPath("$.data.rating").value(4.2))
 				.andExpect(jsonPath("$.data.totalReviewCount").value(120))
 				.andExpect(jsonPath("$.data.relatedReviewCount").value(4))
-				.andExpect(jsonPath("$.data.otherReviewCount").value(116))
+				.andExpect(jsonPath("$.data.otherReviewCount").value(6))
 				.andExpect(jsonPath("$.data.treatment.treatmentId").value(selectedTreatment.getId()))
 				.andExpect(jsonPath("$.data.treatment.regularPrice").value(1900000))
 				.andExpect(jsonPath("$.data.treatment.discountPrice").hasJsonPath())
@@ -219,8 +219,8 @@ class HospitalDetailControllerTest {
 	}
 
 	@Test
-	@DisplayName("시술 관련 리뷰가 전체 리뷰 수보다 많아도 다른 리뷰 수는 음수가 되지 않는다")
-	void clampOtherReviewCountToZero() throws Exception {
+	@DisplayName("저장된 전체 리뷰 수가 실제보다 작아도 다른 리뷰 수는 실제 데이터로 계산한다")
+	void countOtherReviewsIndependentlyOfStoredCount() throws Exception {
 		entityManager.createQuery("update Hospital h set h.reviewCount = 2 where h.id = :hospitalId")
 				.setParameter("hospitalId", hospital.getId()).executeUpdate();
 		entityManager.clear();
@@ -230,12 +230,12 @@ class HospitalDetailControllerTest {
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.data.totalReviewCount").value(2))
 				.andExpect(jsonPath("$.data.relatedReviewCount").value(4))
-				.andExpect(jsonPath("$.data.otherReviewCount").value(0));
+				.andExpect(jsonPath("$.data.otherReviewCount").value(6));
 	}
 
 	@Test
-	@DisplayName("저장된 통계가 null이어도 시술 관련 리뷰 수는 실제 데이터로 계산한다")
-	void countRelatedReviewsWithNullStatistics() throws Exception {
+	@DisplayName("저장된 통계가 null이어도 관련 리뷰와 다른 리뷰 수는 실제 데이터로 계산한다")
+	void countReviewsWithNullStatistics() throws Exception {
 		entityManager.createQuery("""
 				update Hospital h set h.rating = null, h.reviewCount = null where h.id = :hospitalId
 				""").setParameter("hospitalId", hospital.getId()).executeUpdate();
@@ -247,7 +247,7 @@ class HospitalDetailControllerTest {
 				.andExpect(jsonPath("$.data.rating").value(0.0))
 				.andExpect(jsonPath("$.data.totalReviewCount").value(0))
 				.andExpect(jsonPath("$.data.relatedReviewCount").value(4))
-				.andExpect(jsonPath("$.data.otherReviewCount").value(0));
+				.andExpect(jsonPath("$.data.otherReviewCount").value(6));
 	}
 
 	@Test
@@ -264,7 +264,7 @@ class HospitalDetailControllerTest {
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.data.totalReviewCount").value(120))
 				.andExpect(jsonPath("$.data.relatedReviewCount").value(2))
-				.andExpect(jsonPath("$.data.otherReviewCount").value(118));
+				.andExpect(jsonPath("$.data.otherReviewCount").value(8));
 	}
 
 	@Test
@@ -281,7 +281,7 @@ class HospitalDetailControllerTest {
 				.andExpect(jsonPath("$.data.rating").value(4.6))
 				.andExpect(jsonPath("$.data.totalReviewCount").value(50))
 				.andExpect(jsonPath("$.data.relatedReviewCount").value(0))
-				.andExpect(jsonPath("$.data.otherReviewCount").value(50));
+				.andExpect(jsonPath("$.data.otherReviewCount").value(0));
 	}
 
 	private Hospital.HospitalBuilder hospitalBuilder(String name) {
