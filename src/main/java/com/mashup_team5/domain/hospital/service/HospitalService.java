@@ -199,7 +199,6 @@ public class HospitalService {
 				reviewCount(hospital),
 				hospital.getHasSpecialist(),
 				hospital.getHasPublicPrice(),
-				hospital.getHasNightClinic(),
 				hospital.getHasHolidayClinic(),
 				badgeTypes(hospital),
 				priceRows.stream()
