@@ -93,9 +93,11 @@ public class HospitalService {
 				.findFirst()
 				.orElseThrow(() -> new CustomException(ErrorCode.HOSPITAL_TREATMENT_NOT_FOUND));
 		long totalReviewCount = reviewCount(hospital);
+		List<Long> reviewTreatmentIds = ReviewTreatmentMapping.treatmentIdsFor(treatmentId);
 		long relatedReviewCount = reviewRepository.countMatchingReviews(
-				hospitalId, ReviewTreatmentMapping.treatmentIdsFor(treatmentId), true);
-		long otherReviewCount = Math.max(totalReviewCount - relatedReviewCount, 0L);
+				hospitalId, reviewTreatmentIds, true);
+		long otherReviewCount = reviewRepository.countMatchingReviews(
+				hospitalId, reviewTreatmentIds, false);
 		Integer discountPrice = findMallPrices(mallId, List.of(priceRow)).get(priceRow.hospitalTreatmentId());
 		return new HospitalDetailResponse(
 				hospital.getId(),
