@@ -228,6 +228,50 @@ class HospitalControllerTest {
 				.param("hasHolidayClinic", "true"), firstHospital);
 	}
 
+	@ParameterizedTest
+	@CsvSource({
+			"hasSpecialist, 2",
+			"hasPublicPrice, 2",
+			"hasHolidayClinic, 2"
+	})
+	@DisplayName("각 필터의 목록과 count가 일치하고 false는 필터를 적용하지 않는다")
+	void verifyFilterListAndCount(String filter, int expectedCount) throws Exception {
+		mockMvc.perform(get("/api/hospitals").param(filter, "true"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.content.length()").value(expectedCount))
+				.andExpect(jsonPath("$.data.content[*]." + filter).value(contains(true, true)));
+		mockMvc.perform(get("/api/hospitals/count").param(filter, "true"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data").value(expectedCount));
+		assertHospitalIds(get("/api/hospitals").param(filter, "false"),
+				firstHospital, secondHospital, thirdHospital, fourthHospital);
+		mockMvc.perform(get("/api/hospitals/count").param(filter, "false"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data").value(4));
+	}
+
+	@Test
+	@DisplayName("복수 필터의 목록과 count가 일치하고 응답에 병원 속성을 반환한다")
+	void verifyCombinedFilterResponse() throws Exception {
+		mockMvc.perform(get("/api/hospitals").param("hasSpecialist", "true")
+						.param("hasPublicPrice", "true").param("hasHolidayClinic", "true"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.content.length()").value(1))
+				.andExpect(jsonPath("$.data.content[0].hospitalId").value(firstHospital.getId()))
+				.andExpect(jsonPath("$.data.content[0].hasSpecialist").value(true))
+				.andExpect(jsonPath("$.data.content[0].hasPublicPrice").value(true))
+				.andExpect(jsonPath("$.data.content[0].hasHolidayClinic").value(true));
+		mockMvc.perform(get("/api/hospitals/count").param("hasSpecialist", "true")
+						.param("hasPublicPrice", "true").param("hasHolidayClinic", "true"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data").value(1));
+		mockMvc.perform(get("/api/hospitals"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.content[1].hasSpecialist").value(false))
+				.andExpect(jsonPath("$.data.content[2].hasPublicPrice").value(false))
+				.andExpect(jsonPath("$.data.content[1].hasHolidayClinic").value(false));
+	}
+
 	@Test
 	@DisplayName("정상가 기준 최소가, 최대가, 가격 범위와 시술 미지정 가격 조건을 처리한다")
 	void filterByRegularPrice() throws Exception {

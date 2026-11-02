@@ -76,6 +76,19 @@ class HospitalMigrationTest {
 	}
 
 	@Test
+	@DisplayName("V9는 병원별 필터 속성을 엑셀 값으로 저장한다")
+	void verifyHospitalFilterFlags() {
+		assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM hospital", Long.class)).isEqualTo(63);
+		assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM hospital WHERE has_specialist IS NULL OR has_public_price IS NULL OR has_holiday_clinic IS NULL", Long.class)).isZero();
+		assertThat(jdbcTemplate.queryForList("SELECT hospital_id FROM hospital WHERE has_specialist = TRUE ORDER BY hospital_id", Long.class))
+			.containsExactly(1L, 3L, 4L, 5L, 6L, 9L, 11L, 12L, 14L, 15L, 17L, 18L, 20L, 22L, 24L, 25L, 26L, 27L, 32L, 33L, 34L, 35L, 36L, 38L, 41L, 43L, 44L, 46L, 47L, 52L, 53L, 54L, 55L, 56L, 57L, 59L, 60L, 61L, 62L);
+		assertThat(jdbcTemplate.queryForList("SELECT hospital_id FROM hospital WHERE has_public_price = FALSE ORDER BY hospital_id", Long.class))
+			.containsExactly(3L, 8L, 9L, 24L, 26L, 45L, 48L, 49L, 50L, 52L, 56L, 59L);
+		assertThat(jdbcTemplate.queryForList("SELECT hospital_id FROM hospital WHERE has_holiday_clinic = TRUE ORDER BY hospital_id", Long.class))
+			.containsExactly(2L, 6L, 7L, 9L, 10L, 13L, 14L, 15L, 29L, 33L, 34L, 36L, 37L, 40L, 41L, 43L, 44L, 46L, 49L, 51L, 52L, 53L, 54L, 55L, 57L, 59L, 60L);
+	}
+
+	@Test
 	@DisplayName("선택지에서 비노출 시술과 비노출 시술만 있는 카테고리를 제외한다")
 	void hideFilterTreatments() {
 		List<CategoryResponse> categories = categoryService.getCategories();
