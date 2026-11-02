@@ -228,6 +228,27 @@ class HospitalControllerTest {
 				.param("hasHolidayClinic", "true"), firstHospital);
 	}
 
+	@Test
+	@DisplayName("야간 진료 검색은 유지하고 응답에는 야간 진료 배지만 반환한다")
+	void filterNightClinicAndReturnBadge() throws Exception {
+		mockMvc.perform(get("/api/hospitals").param("hasNightClinic", "true"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.content[*].hospitalId").value(contains(
+						firstHospital.getId().intValue(), secondHospital.getId().intValue())))
+				.andExpect(jsonPath("$.data.content[0].badgeTypes").value(org.hamcrest.Matchers.hasItem("NIGHT_CLINIC")))
+				.andExpect(jsonPath("$.data.content[1].badgeTypes").value(org.hamcrest.Matchers.hasItem("NIGHT_CLINIC")))
+				.andExpect(jsonPath("$.data.content[0].hasNightClinic").doesNotHaveJsonPath())
+				.andExpect(jsonPath("$.data.content[1].hasNightClinic").doesNotHaveJsonPath());
+		mockMvc.perform(get("/api/hospitals/count").param("hasNightClinic", "true"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data").value(2));
+		assertHospitalIds(get("/api/hospitals").param("hasNightClinic", "false"),
+				firstHospital, secondHospital, thirdHospital, fourthHospital);
+		mockMvc.perform(get("/api/hospitals/count").param("hasNightClinic", "false"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data").value(4));
+	}
+
 	@ParameterizedTest
 	@CsvSource({
 			"hasSpecialist, 2",
@@ -689,6 +710,11 @@ class HospitalControllerTest {
 		mockMvc.perform(get("/v3/api-docs"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.paths['/api/hospitals'].get.parameters[?(@.name=='medicalCategoryId')]").isNotEmpty())
+				.andExpect(jsonPath("$.paths['/api/hospitals'].get.parameters[?(@.name=='hasNightClinic')]").isNotEmpty())
+				.andExpect(jsonPath("$.paths['/api/hospitals/count'].get.parameters[?(@.name=='hasNightClinic')]").isNotEmpty())
+				.andExpect(jsonPath("$.components.schemas.HospitalResponse.properties.hasNightClinic").doesNotHaveJsonPath())
+				.andExpect(jsonPath("$.components.schemas.HospitalResponse.properties.badgeTypes").exists())
+				.andExpect(jsonPath("$.components.schemas.HospitalDetailResponse.properties.hasNightClinic").doesNotHaveJsonPath())
 				.andExpect(jsonPath("$.paths['/api/hospitals'].get.parameters[?(@.name=='treatmentIds')].schema.type")
 						.value(contains("array")))
 				.andExpect(jsonPath("$.paths['/api/hospitals'].get.parameters[?(@.name=='treatmentIds')].schema.items.type")
@@ -760,6 +786,7 @@ class HospitalControllerTest {
 				.andExpect(jsonPath("$.data.content[1].badgeTypes")
 						.value(contains("NIGHT_CLINIC", "SAME_DAY_BOOKING")))
 				.andExpect(jsonPath("$.data.content[2].badgeTypes").value(contains("SAME_DAY_BOOKING")))
+				.andExpect(jsonPath("$.data.content[2].hasNightClinic").doesNotHaveJsonPath())
 				.andExpect(jsonPath("$.data.content[*].isReservable").doesNotExist())
 				.andExpect(jsonPath("$.data.content[*].treatments[*].isSpecialOffer").doesNotExist());
 

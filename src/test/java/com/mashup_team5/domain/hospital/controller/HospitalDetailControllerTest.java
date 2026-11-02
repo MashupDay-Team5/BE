@@ -114,6 +114,7 @@ class HospitalDetailControllerTest {
 				.andExpect(jsonPath("$.success").value(true))
 				.andExpect(jsonPath("$.data.hospitalId").value(hospital.getId()))
 				.andExpect(jsonPath("$.data.hospitalName").value("OO안과"))
+				.andExpect(jsonPath("$.data.hasNightClinic").doesNotHaveJsonPath())
 				.andExpect(jsonPath("$.data.address").value("서울특별시 서초구 서초대로 123"))
 				.andExpect(jsonPath("$.data.region.sidoId").value(seoul.getId()))
 				.andExpect(jsonPath("$.data.region.sidoName").value("서울특별시"))
